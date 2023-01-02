@@ -1,5 +1,9 @@
 #!/bin/sh
 
+clear_screen() {
+	printf "\ec"
+}
+
 color_print() {
 	RED='\033[0;31m'
 	GREEN='\033[0;32m'
@@ -19,11 +23,11 @@ color_print() {
 	RESET='\033[0m'
 
 	if [ "$#" -eq 1 ]; then
-		echo $1 #"${RED}$1${RESET}"
+		echo -e $1 #"${RED}$1${RESET}"
 	elif [ "$#" -eq 2 ]; then
 		# eval COLOR=\$$1
-		# echo "${COLOR}$2${RESET}"
-		echo $2
+		# echo -e "${COLOR}$2${RESET}"
+		echo -e $2
 	fi
 }
 
@@ -57,8 +61,11 @@ get_file_size() {
 	# du -b $1 | awk '{print $1}' # not working on camera
 	# du -a $1 | awk '{print $1}' # working on camera, but not accurate, it shows kb value
 	# ls -l $1 | cut -d" " -f5 # not working on camera
-	ls -l $1 | awk '{print $5}' # working
-
+	if [ -f "$1" ]; then
+		ls -l $1 | awk '{print $5}' # working
+	else 
+		echo 0
+	fi 
 }
 
 get_percentage() {

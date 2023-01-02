@@ -4,14 +4,17 @@
 # save last upload file information for reboot check
 
 manage_video_uploads() {
-	local idle_transfer_mode=$(jq --raw-output '.idle_transfer' config.json)
+	local idle_transfer_mode=$(jq --raw-output '.enable_idle_transfer' config.json)
 	local camera_idled=false
-	echo '${idle_transfer_mode}' ${idle_transfer_mode}
-
+	
 	echo -e "\n\nStart to check video and image files for upload..."
+	if [ "${idle_transfer_mode}" = true ]; then
+		color_print "GREEN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
+		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
+	fi 
 
 	while [ 1 ]; do
-		if [ "${idle_transfer_mode}" = true ] ; then
+		if [ "${idle_transfer_mode}" = true ]; then
 			camera_idled=$(check_camera_idle_status)
 		fi
 
@@ -39,14 +42,16 @@ check_drive_free_space() {
 	local remaining=$(echo ${resp} | jq '.quota.remaining')
 	local total=$(echo ${resp} | jq '.quota.total')
 
-	echo  $((remaining*100/total))  $((100 - ${auto_clean_threshold}))
+	# echo  $((100 - ${auto_clean_threshold}))
 	if [ $((remaining*100/total)) -lt $((100 - ${auto_clean_threshold})) ]; then 
 		remove_earliest_folders
 	fi
 
 	if [ $# -gt 0 ]; then 
 		local used_ratio=$(get_percentage ${used} ${total})
-	 	color_print "GREEN" "Your have used ${used_ratio} of your storage space, with $((remaining/1024/1024/1024))GB free. check './drive_status.json' to see your drive quota details."
+		local free_ratio=$(get_percentage ${remaining} ${total})
+	 	color_print "GREEN" "Your have used ${used_ratio} of your storage space, with $((remaining/1024/1024/1024))GB(${free_ratio}) free space."
+		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 	fi	
 }
 
@@ -57,14 +62,21 @@ remove_earliest_folders() {
 
 
 check_camera_idle_status() {
-	local size_1=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
-	sleep 10
-	local size_2=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
-	if [ ${size_1} -eq ${size_2} ]; then
-		echo true
-	else 
-		echo false
+	local idled=false
+	if [ -f "/tmp/sd/record/tmp.mp4.tmp" ]; then
+		local size_1=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
+		sleep 10
+		local size_2=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
+		if [ ${size_1} -eq ${size_2} ]; then
+			idled=true
+		fi
+	else
+		sleep 10
+		if [ -f "/tmp/sd/record/tmp.mp4.tmp" ]; then 
+			idled=true
+		fi 
 	fi
+	echo ${idled}
 }
 
 # get the earlist file which has not been uploaded yet
@@ -93,14 +105,15 @@ get_one_file_to_upload() {
 # param: optional, $1=filename
 build_media_file_index() {
 	if [ $# -eq 0 ]; then
-		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) > ./data/files.index  
+		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
+		| xargs ls -1rt > ./data/files.index  
 	else
 		local last_uploaded_file_ts=$(get_file_created_timestamp $1)
 		local current_time_ts=$(date +%s)
 		local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))
 
 		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
-		-mmin -${eclipsed_mins} > ./data/files.index  
+		-mmin -${eclipsed_mins} | xargs ls -1rt > ./data/files.index  
 	fi 
 	using_fileindex=true
 }
@@ -161,7 +174,7 @@ get_next_file() {
 	fi 
 
 	# get next file from current or next newer folder (by hourly-named folder)
-	if [ ${using_fileindex} = false ] || [ -z "${next_file}" ]; then 
+	if [ "${using_fileindex}" = false ] || [ -z "${next_file}" ]; then 
 		using_fileindex=false 
 		local file_name=$(parse_file_name ${last_uploaded})
 		local file_parent=$(parse_file_parent ${last_uploaded})
@@ -210,6 +223,7 @@ update_file_upload_data() {
 	--arg utcts "$(date +%s)" \
 	'.file_path |= $file | .upload_time |= $date | .timestamp |= $utcts' \
 	> ./data/last_upload.json
+	echo $1 >> ./log/upload.history
 }
 
 # check_camera_idle_status

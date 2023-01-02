@@ -8,14 +8,14 @@ send_api_request() {
 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
 	resp=`eval $query` # | jq  --raw-output '.error.message'`
 	# echo $resp
-	api_error_message=$(echo ${resp} | jq --raw-output '.error.message')
-	echo $api_error_message
+	api_error_message=$(echo ${resp} | jq --raw-output '.error.message')	
 	if [ ! -z "${api_error_message}" ] && [ "${api_error_message}" != "null" ]; then
 		error=$api_error_message
 		write_log $@ "$api_error_message"
+		echo $api_error_message
 	else
 		error=''
-		color_print "GREEN" "Success: $1"
+		color_print "GREEN" "Success: $*"
 	fi
 }
 
@@ -61,8 +61,6 @@ upload_small_file() {
 	local file_name=$(parse_file_name $1)
 	local file_parent=$(parse_file_parent $1)
 	local target_path=${video_root_folder}/${file_parent}/${file_name}
-
-	echo $file_name $file_parent
 
 	query="curl -s -k -L -X PUT '${DRIVE_BASE_URI}/items/root:/${target_path}:/content'"	
 	query="${query} --upload-file $1"
@@ -133,13 +131,21 @@ upload_large_file_by_chunks() {
 			echo $range_start $range_end
 			echo $range_length			
 
-			dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2>/dev/null |
+			dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null |
 			curl -s -k -L -X PUT ${upload_url} \
 			--data-binary "${filename}"@- \
+			-H "Transfer-Encoding: chunked" \
 			-H "Content-Length: ${range_length}" \
 			-H "Content-Range: bytes ${range_start}-${range_end}/${2}" \
-			-o /dev/null  # there is a session url error after the last chunk is transimitted
-			# > /dev/null # {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
+			-o /dev/null  
+			# > /dev/null 2>&1
+
+			# there is 2 errors warning here:
+			# 1. a session url error after the last chunk is transimitted
+			# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
+			# 2. curl: option --data-binary: out of memory
+			# can not be fixed and redircted to null curl
+			# but file transmission still work
 
 			chunk_index=$((${chunk_index}+1))
 		done 

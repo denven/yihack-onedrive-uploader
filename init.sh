@@ -23,10 +23,10 @@ init_globals() {
 
 	mkdir -p data log # prepare folders to store upload info and logs
 
-	echo "Checking your configuration..."
+	echo "Checking your OneDrive uploader configuration..."
 	if [ ! -f ./config.json ]; then
 		echo '{ "grant_type": "", "client_id": "", "client_secret": "", "tenant_id": "" }' \
-		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "90", "idle_transfer": "false"}' \
+		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "90", "enable_idle_transfer": "false"}' \
 		> config.json
 		color_print "BROWN" "A template config.json file is generated for you, please fill in it and try again."
 		exit 0
@@ -44,7 +44,7 @@ test_onedrive_status() {
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1
 	else
-		check_drive_free_space "1st"
+		check_drive_free_space "1st-time"
 		color_print "GREEN" "Your OneDrive access is available."
 	fi
 }
@@ -81,12 +81,14 @@ create_video_root_folder() {
 			break
 		fi
 	else
-		color_print "GREEN" "Great! you've already specified a folder '${video_root_folder}' to store your video files."		
+		color_print "GREEN" "You've already specified the folder '${video_root_folder}' to store your video files."		
+		color_print "GREEN" "Configuration check is done: OK"
 	fi 
 }
 
 
 init() {
+	clear_screen
 	init_globals
 
 	manage_oauth2_tokens
@@ -97,9 +99,9 @@ init() {
 
 	manage_video_uploads
 
-	while [ 1 ]; do
-		sleep 60
-	done 	
+	# while [ 1 ]; do
+	# 	sleep 60
+	# done 	
 	exit 0
 }	
 

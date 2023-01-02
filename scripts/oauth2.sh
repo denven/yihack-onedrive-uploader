@@ -63,7 +63,7 @@ redeem_oauth2_tokens() {
 }
 
 # refresh tokens in case of expiry by default
-# if $1="test", it is testing the expriation of refresh_token
+# param: not required, if $1="test", it is testing the exipiration of refresh_token
 refresh_oauth2_tokens() {
 	while [ 1 ] ; do
 		if [ "$#" -lt 1 ]; then
@@ -83,15 +83,14 @@ refresh_oauth2_tokens() {
 		error=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
 		if [ ! -z $access_token ]; then
 			echo ${resp} | jq '.' > ./data/token.json
-			color_print "GREEN" "Refresh the tokens successfully"				
-		elif [ ! -z $error ]; then
+			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."				
+		elif [ ! -z ${error} ]; then
 			write_log ${error}
 			break
 		fi
 
 		if [ "$#" -ge 1 ]; then
-			color_print "GREEN" "The refresh token is still valid"
-			break  # test nide
+			break  # test completed
 		fi
 	done 
 }
