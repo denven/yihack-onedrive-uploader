@@ -1,0 +1,8 @@
+{
+	"grant_type": "authorization_code",
+	"client_id": "",
+	"client_secret": "",
+	"tenant_id": "",
+	"scope": "https://graph.microsoft.com/.default",
+	"video_root_folder": "yihack_videos"
+}
