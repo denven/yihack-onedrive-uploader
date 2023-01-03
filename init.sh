@@ -1,13 +1,6 @@
 #!/bin/sh
 
-# some models only support the original sh shell instead of bash etc.
-
-onedrive_dir="/tmp/sd/yi-hack/onedrive"
-onedrive_bin_dir="/tmp/sd/yi-hack/bin"
-onedrive_lib_dir="/tmp/sd/yi-hack/lib"
-startup_sh="/tmp/sd/yi-hack/startup.sh"
-
-# include other modules
+# include other shell scripts
 . "$PWD/scripts/api.sh"
 . "$PWD/scripts/utils.sh"
 . "$PWD/scripts/oauth2.sh"
@@ -23,7 +16,7 @@ init_globals() {
 
 	mkdir -p data log # prepare folders to store upload info and logs
 
-	echo "Checking your OneDrive uploader configuration..."
+	color_print "GREEN" "Checking your OneDrive-uploader configuration..."
 	if [ ! -f ./config.json ]; then
 		echo '{ "grant_type": "", "client_id": "", "client_secret": "", "tenant_id": "" }' \
 		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "90", "enable_idle_transfer": "false"}' \
@@ -36,10 +29,12 @@ init_globals() {
 			auto_clean_threshold=90
 		fi	
 	fi
+
+	enable_auto_start # add to auto start when rebooting
 }
 
 test_onedrive_status() {		
-	get_my_drive # test drive access
+	get_my_drive_info # test drive access
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1
@@ -52,7 +47,7 @@ test_onedrive_status() {
 create_video_root_folder() {
 	video_root_folder=$(jq --raw-output '.video_root_folder' config.json)
 	video_root_folder_id=$(jq --raw-output '.video_root_folder_id' config.json)
-	echo $video_root_folder $video_root_folder_id
+	# echo $video_root_folder $video_root_folder_id
 
 	local need_create=true
 	if [ ! -z "${video_root_folder_id}" ] && [ "${video_root_folder_id}" != "null" ]; then
@@ -78,11 +73,12 @@ create_video_root_folder() {
 			rm -f tmpfile	
 
 			color_print "GREEN" "Created folder ${video_root_folder} to store your video files successfully."
+			color_print "GREEN" "Configuration is done."
 			break
 		fi
 	else
 		color_print "GREEN" "You've already specified the folder '${video_root_folder}' to store your video files."		
-		color_print "GREEN" "Configuration check is done: OK"
+		color_print "B_GREEN" "Configuration check is done: OK"
 	fi 
 }
 

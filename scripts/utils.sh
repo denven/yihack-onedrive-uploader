@@ -4,6 +4,16 @@ clear_screen() {
 	printf "\ec"
 }
 
+enable_auto_start() {
+	local auto_start_file="/tmp/sd/yi-hack/startup.sh"
+
+	[ -f "${auto_start_file}" ] || touch ${auto_start_file} 
+
+	if [ -z "$(grep '/tmp/sd/yi-hack/onedrive/init.sh' ${auto_start_file})" ]; then 
+		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh &' >> ${auto_start_file}
+	fi 
+}
+
 color_print() {
 	RED='\033[0;31m'
 	GREEN='\033[0;32m'
@@ -25,9 +35,9 @@ color_print() {
 	if [ "$#" -eq 1 ]; then
 		echo -e $1 #"${RED}$1${RESET}"
 	elif [ "$#" -eq 2 ]; then
-		# eval COLOR=\$$1
-		# echo -e "${COLOR}$2${RESET}"
-		echo -e $2
+		eval COLOR=\$$1
+		echo -e "${COLOR}$2${RESET}"
+		# echo -e $2
 	fi
 }
 
@@ -75,6 +85,16 @@ get_percentage() {
 write_log() {
 	echo `date`": $*" >> ./log/logs
 	# echo `date`": $*" | tee -a logs # to be tested
+}
+
+# backup log file to *.old when it is larger than 1MB
+process_log_file() {
+	for log_file in ./log/*; do
+		if [ $(ls -l ${log_file} | awk '{print $5}') -gt 1048576 ] && [ -z $(echo "${log_file}" | grep "old") ]; then
+			mv ${log_file} ${log_file}.old 
+			touch ${log_file} 
+		fi
+	done 
 }
 
 set_cleanup_traps() {

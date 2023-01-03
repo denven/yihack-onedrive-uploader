@@ -1,10 +1,6 @@
 #!/bin/sh
 
 send_api_request() {
-	# if $(echo ${query} | grep -q -v "uploadSession"); then
-	# 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
-	# fi
-	echo $query
 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
 	resp=`eval $query` # | jq  --raw-output '.error.message'`
 	# echo $resp
@@ -12,16 +8,15 @@ send_api_request() {
 	if [ ! -z "${api_error_message}" ] && [ "${api_error_message}" != "null" ]; then
 		error=$api_error_message
 		write_log $@ "$api_error_message"
-		echo $api_error_message
 	else
 		error=''
 		color_print "GREEN" "Success: $*"
 	fi
 }
 
-get_my_drive() {	
+get_my_drive_info() {	
 	query='curl -s -k -L -X GET '${DRIVE_BASE_URI}
-	send_api_request "get_my_drive"	
+	send_api_request "get_my_drive_info"	
 	echo $resp | jq '.quota' > ./data/drive_status.json 
 	drive_id=$(echo $resp | jq '.id')
 }
@@ -115,7 +110,7 @@ upload_large_file_by_chunks() {
 	echo "upload_large_file_by_chunks" $2
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
-		local chunk_index=0; chunk_size=4194304
+		local chunk_index=0; chunk_size=5242880 # 5Mb
 		local range_start=0; range_end=0; range_length=0
 
 		while [ $((${chunk_index}*${chunk_size})) -lt $2 ]; do

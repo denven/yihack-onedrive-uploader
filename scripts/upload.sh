@@ -7,9 +7,9 @@ manage_video_uploads() {
 	local idle_transfer_mode=$(jq --raw-output '.enable_idle_transfer' config.json)
 	local camera_idled=false
 	
-	echo -e "\n\nStart to check video and image files for upload..."
+	color_print "GREEN" "\nStart to check video and image files for upload..."
 	if [ "${idle_transfer_mode}" = true ]; then
-		color_print "GREEN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
+		color_print "BROWN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
 	fi 
 
@@ -22,20 +22,21 @@ manage_video_uploads() {
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
 				echo "Start to upload ${file}"
-				upload_one_file ${file}
+				upload_one_file ${file}		
+				process_log_file
+				sleep 10 # send file every 10s
 			else 
-				echo "All files are uploaded, wait for a new available one."
+				echo "All files were uploaded, wait for a new recorded video or picture file."
+				sleep 60 # check after one minute
 			fi 
 		fi
-
-		sleep 10
 	done
 }
 
 # param: optional, when $1 is passed, it is the first-time check
 check_drive_free_space() {
 	if [ $# -eq 0 ]; then 
-	 	get_my_drive  # check periodically by default
+	 	get_my_drive_info  # check periodically by default
 	fi
 
 	local used=$(echo ${resp} | jq '.quota.used')
@@ -88,13 +89,13 @@ get_one_file_to_upload() {
 		file=$(cat ./data/files.index | awk 'FNR <= 1')
 	else 
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
-		echo "found last_upload.json" $last_uploaded >> debug
+		echo "found last_upload.json" $last_uploaded >> ./log/debug
 
 		if [ ! -f "${last_uploaded}" ]; then 
 			build_media_file_index ${last_uploaded}  # when last uploaded file has been deleted
 			file=$(cat ./data/files.index | awk 'FNR <= 1')
 		else 
-			echo "check next file by last_upload.json" ${last_uploaded} >> debug
+			echo "check next file by last_upload.json" ${last_uploaded} >> ./log/debug
 			file=$(get_next_file ${last_uploaded}) # last uploaded file still exists		
 		fi 
 	fi 
@@ -126,7 +127,7 @@ get_file_created_timestamp(){
   	hhmmss=$(echo ${uniq_name}  | cut -c 12-13):$(echo ${uniq_name} | cut -c 15-16):$(echo ${uniq_name} | cut -c 18-19)
 
   	rfc_fmt_date="${YYYYMMDD} ${hhmmss}"
-	echo "rfc_fmt_date" $rfc_fmt_date >> debug
+	echo "rfc_fmt_date" $rfc_fmt_date >> ./log/debug
   	echo $(date -d "${rfc_fmt_date}" +%s)
 }
 
@@ -186,18 +187,18 @@ get_next_file() {
 		if [ -z "${next_file}" ]; then
 			local next_folder=$(get_next_folder ${file_parent})
 			if [ ! -z "${next_folder}" ]; then 
-				next_file=$(find folderpath -type f | awk 'FNR <= 1')	
+				next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	
 			fi		
 		fi 
 	fi 
-	echo ${next_file} >> debug
+	echo ${next_file} >> ./log/debug
 	echo ${next_file}
 }
 
 # param: $1=current_folder_name, like 2022Y11M12D15H
 # return: hourly-named folder name, like 2022Y11M12D16H
 get_next_folder() {
-	ls -d 202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
+	ls -d /tmp/sd/record/202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
 }
 
 # param: $1=sd_video_file_path
@@ -206,7 +207,7 @@ upload_one_file() {
 	if [ ${file_size} -lt $((4*1024*1024)) ]; then
 		upload_small_file $1
 	else
-		echo "$file_size:"  $file_size >> debug
+		echo "$file_size:"  $file_size >> ./log/debug
 		upload_large_file $1 ${file_size}
 	fi
 
