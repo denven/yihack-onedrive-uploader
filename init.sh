@@ -29,8 +29,6 @@ init_globals() {
 			auto_clean_threshold=90
 		fi	
 	fi
-
-	enable_auto_start # add to auto start when rebooting
 }
 
 test_onedrive_status() {		

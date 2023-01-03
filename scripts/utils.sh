@@ -9,7 +9,7 @@ enable_auto_start() {
 
 	[ -f "${auto_start_file}" ] || touch ${auto_start_file} 
 
-	if [ -z "$(grep '/tmp/sd/yi-hack/onedrive/init.sh' ${auto_start_file})" ]; then 
+	if [ -z "$(grep 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh' ${auto_start_file})" ]; then 
 		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh &' >> ${auto_start_file}
 	fi 
 }

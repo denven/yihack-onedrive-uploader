@@ -57,6 +57,7 @@ redeem_oauth2_tokens() {
 	api_error_msg=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
 	if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
 		color_print "GREEN" "Get OneDrive access tokens successfully"
+		enable_auto_start
 	elif [ ! -z $api_error_msg ]; then
 		color_print "BROWN" ${api_error_msg}
 	fi
