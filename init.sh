@@ -32,7 +32,7 @@ init_globals() {
 }
 
 test_onedrive_status() {		
-	get_my_drive_info # test drive access
+	get_drive_status # test drive access
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1
@@ -75,7 +75,7 @@ create_video_root_folder() {
 			break
 		fi
 	else
-		color_print "GREEN" "You've already specified the folder '${video_root_folder}' to store your video files."		
+		color_print "GREEN" "You've specified the folder '${video_root_folder}' to store your files."		
 		color_print "B_GREEN" "Configuration check is done: OK"
 	fi 
 }
@@ -83,8 +83,9 @@ create_video_root_folder() {
 
 init() {
 	clear_screen
-	init_globals
+	run_singleton
 
+	init_globals
 	manage_oauth2_tokens
 	set_cleanup_traps
 

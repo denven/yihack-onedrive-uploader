@@ -3,20 +3,20 @@
 send_api_request() {
 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
 	resp=`eval $query` # | jq  --raw-output '.error.message'`
-	# echo $resp
+	# echo -e "$query \n $resp"
 	api_error_message=$(echo ${resp} | jq --raw-output '.error.message')	
 	if [ ! -z "${api_error_message}" ] && [ "${api_error_message}" != "null" ]; then
 		error=$api_error_message
-		write_log $@ "$api_error_message"
+		write_log "$@, Error: $api_error_message"
 	else
 		error=''
 		color_print "GREEN" "Success: $*"
 	fi
 }
 
-get_my_drive_info() {	
+get_drive_status() {	
 	query='curl -s -k -L -X GET '${DRIVE_BASE_URI}
-	send_api_request "get_my_drive_info"	
+	send_api_request "get_drive_status"	
 	echo $resp | jq '.quota' > ./data/drive_status.json 
 	drive_id=$(echo $resp | jq '.id')
 }
@@ -71,7 +71,7 @@ upload_large_file() {
 	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
 	
 	local upload_path=${video_root_folder}/${file_parent}/${file_name}
-	query="curl -s -k -L -X PUT '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
+	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
 
@@ -91,6 +91,13 @@ upload_large_file() {
 		-H "Content-Range: bytes 0-$((${2}-1))/${2}" \
 		> /dev/null
 
+		# there is 2 errors warning here when use PUT instead of POST:
+		# 1. a session url error after the last chunk is transimitted
+		# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
+		# 2. curl: option --data-binary: out of memory
+		# can not be fixed and redircted to null curl
+		# but file transmission still work
+
 		curl -s -k -L -X DELETE ${upload_url}  # delete session after upload
 	fi
 }
@@ -103,11 +110,11 @@ upload_large_file_by_chunks() {
 	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
 	
 	local upload_path=${video_root_folder}/${file_parent}/${file_name}
-	query="curl -s -k -L -X PUT '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
+	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
+	color_print "GREEN" "upload_large_file_by_chunks $2 bytes"
 
-	echo "upload_large_file_by_chunks" $2
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
 		local chunk_index=0; chunk_size=5242880 # 5Mb
@@ -122,10 +129,6 @@ upload_large_file_by_chunks() {
 			fi
 			range_length=$((${range_end}-${range_start}+1))
 
-			echo $chunk_index $chunk_size
-			echo $range_start $range_end
-			echo $range_length			
-
 			dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null |
 			curl -s -k -L -X PUT ${upload_url} \
 			--data-binary "${filename}"@- \
@@ -134,13 +137,6 @@ upload_large_file_by_chunks() {
 			-H "Content-Range: bytes ${range_start}-${range_end}/${2}" \
 			-o /dev/null  
 			# > /dev/null 2>&1
-
-			# there is 2 errors warning here:
-			# 1. a session url error after the last chunk is transimitted
-			# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
-			# 2. curl: option --data-binary: out of memory
-			# can not be fixed and redircted to null curl
-			# but file transmission still work
 
 			chunk_index=$((${chunk_index}+1))
 		done 

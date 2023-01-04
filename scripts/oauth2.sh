@@ -50,12 +50,14 @@ redeem_oauth2_tokens() {
 	--data-urlencode "client_id=${client_id}" \
 	--data-urlencode "client_secret=${client_secret}" \
 	--data-urlencode "code=${auth_code}" \
-	| jq '.' > ./data/token.json
-	
+	| jq '.' > ./data/token.json	
+
 	access_token=$(jq --raw-output '.access_token' ./data/token.json)
 	refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
 	api_error_msg=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
 	if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
+		# backup for check new configuration
+		cp ./config.json ./data/config.bak
 		color_print "GREEN" "Get OneDrive access tokens successfully"
 		enable_auto_start
 	elif [ ! -z $api_error_msg ]; then
@@ -83,7 +85,7 @@ refresh_oauth2_tokens() {
 		refresh_token=$(echo ${resp} | jq --raw-output '.refresh_token')
 		error=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
 		if [ ! -z $access_token ]; then
-			echo ${resp} | jq '.' > ./data/token.json
+			echo ${resp} | jq '.' > ./data/token.json			
 			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."				
 		elif [ ! -z ${error} ]; then
 			write_log ${error}
@@ -100,18 +102,27 @@ manage_oauth2_tokens() {
 	local need_re_assign=true  # re-assign the tokens or not
 
 	oauth2_read_configs	
-	if [ -f ./data/token.json ]; then
-		access_token=$(jq --raw-output '.access_token' ./data/token.json)
-		refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
-		if [ ! -z $access_token ] && [ ! -z $refresh_token ]; then 
-			color_print "GREEN" "Found an existing refresh token, start to test its availability..."
-			refresh_oauth2_tokens "test"
-		fi		
-		if [ -z $error ] || [ "$error" = "null" ]; then
-			need_re_assign=false
-		else 
-			color_print "GREEN" "The existing refresh token is still valid"
-		fi 
+
+	if [ -f ./data/config.bak ]; then
+		local bak_client_id=$(jq --raw-output '.client_id' ./data/config.bak)
+		local bak_client_secret=$(jq --raw-output '.client_secret' ./data/config.bak)
+		local bak_tenant_id=$(jq --raw-output '.tenant_id' ./data/config.bak)
+
+		if [ "${client_id}" != "${bak_client_id}" ] || [ "${client_secret}" != "${bak_client_secret}" ] || [ "${tenant_id}" != "${bak_tenant_id}" ]; then 
+			color_print "B_BROWN" "You've changed the API credential data, a new authorization code should be granted..."
+		elif [ -f ./data/token.json ]; then
+			access_token=$(jq --raw-output '.access_token' ./data/token.json)
+			refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
+			if [ ! -z $access_token ] && [ ! -z $refresh_token ]; then 
+				color_print "GREEN" "Found an existing refresh token, start to test its availability..."
+				refresh_oauth2_tokens "test"
+			fi		
+			if [ -z $error ] || [ "$error" = "null" ]; then
+				need_re_assign=false
+			else 
+				color_print "GREEN" "The existing refresh token is still valid"
+			fi 
+		fi
 	fi
 
 	if [ ${need_re_assign} = true ]; then

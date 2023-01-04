@@ -32,7 +32,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 - For business/organization tenant user, add `Files.ReadWrite.All`
 ![Set up API Permissions](./screenshots/API_permissions_1.png)
 ![Set up API Permissions](./screenshots/API_permissions_2.png)
-- For personal account user, add `Files.Read` and `Files.ReadWrite.All`
+- For personal account user, add `Files.ReadWrite` and `Files.ReadWrite.All`
 ![Set up API Permissions](./screenshots/API_permissions_Personal.png)
 
 
@@ -42,7 +42,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 4. create a client secret and save the secret **Value** for next steps
 ![Get client credential](./screenshots/client_secret.png)
 
-5. Authentication setting for personal account type only:
+5. Authentication setting for personal account type only
 ![Authentication](./screenshots/personal_authentication.png)   
 
 ### Use the repository code to upload your media files
@@ -60,19 +60,19 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 ```
 - configuration key and value description
   
-|     Configuration key   |      default value      |     Required       |     note       |
+|     Configuration key   |      default value      |     Required       |     Description       |
 | :---------------------: | :---------------------: | :----------------: | :----------------: |
 |    grant_type | authorization_code | true |
 |    client_id | "" | true | fill in with your data
 |    client_secret | "" | true | fill in with your data
-|    tenant_id | "" | false | for person account type, make sure it is empty as ""; for tenant account type, it requires a tenant id.
-|    scope | https://graph.microsoft.com/.default | false |
-|    video_root_folder | yihack_videos | false |
+|    tenant_id | "" | true | for person account, set it as "consumers"; for tenant account, set a specific tenant id.
+|    scope | https://graph.microsoft.com/.default | true |
+|    video_root_folder | yihack_videos | true | name string without white spaces
 |    auto_clean_threshold | 90 | false | not supported yet
 |    enable_idle_transfer | false | false |
 
 
-3. upload the code and `config.json` files to your camera sd card via `ssh` with `root` account or a FTP tool, target path: `/tmp/sd/yi-hack`, make sure you've uploaded the required files to `/tmp/sd/yi-hack/onedrive`:
+1. upload the code and `config.json` files to your camera sd card via `ssh` with `root` account or a FTP tool, target path: `/tmp/sd/yi-hack`, make sure you've uploaded the required files to `/tmp/sd/yi-hack/onedrive`:
    - `init.sh`
    - `config.json`
    - `scripts` directory: with 4 shell script files inside: `api.sh`, `oauth2.sh`, `upload.sh`, `utils.sh`
@@ -95,10 +95,13 @@ cd /tmp/sd/yihack/onedrive/
 ```
 ![Ahthorize uploader](./screenshots/application_authorization.png)
 
-- Follow the URL redirections to consent, sign in, etc. and then get a authorization code, copy the code to your camera terminal and continue.
+- Follow the URL redirections to consent, sign in, etc. and then you will get a authorization code, copy the code to your camera terminal and continue.
 - Now, you've set up yourOneDrive uploader. The script will begin to search media files not uploaded from camera sd card to upload, it may throw some information or error messages on your terminal. Error message like `curl: option --data-binary: out of memory` is tolerable and has no issue to the file upload.
+![Successful configuration](./screenshots/successful_configuration.png)
+
 
 5. optional: reboot your camera
+
 
 ## Todo list
 - [ ] Auto-clean the oldest uploaded folders before the drive space is exhausted

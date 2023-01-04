@@ -14,6 +14,14 @@ enable_auto_start() {
 	fi 
 }
 
+run_singleton() {
+	for pid in $(ps -a | grep \.init\.sh | grep -v grep | awk '{print $1}'); do 
+		if [ ${pid} -ne $$ ]; then 
+			kill -9 $pid &> /dev/null
+		fi  
+	done
+}
+
 color_print() {
 	RED='\033[0;31m'
 	GREEN='\033[0;32m'

@@ -7,7 +7,7 @@ manage_video_uploads() {
 	local idle_transfer_mode=$(jq --raw-output '.enable_idle_transfer' config.json)
 	local camera_idled=false
 	
-	color_print "GREEN" "\nStart to check video and image files for upload..."
+	color_print "GREEN" "\nStart to check camera video and image files for uploading..."
 	if [ "${idle_transfer_mode}" = true ]; then
 		color_print "BROWN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
@@ -36,7 +36,7 @@ manage_video_uploads() {
 # param: optional, when $1 is passed, it is the first-time check
 check_drive_free_space() {
 	if [ $# -eq 0 ]; then 
-	 	get_my_drive_info  # check periodically by default
+	 	get_drive_status  # check periodically by default
 	fi
 
 	local used=$(echo ${resp} | jq '.quota.used')
@@ -51,7 +51,7 @@ check_drive_free_space() {
 	if [ $# -gt 0 ]; then 
 		local used_ratio=$(get_percentage ${used} ${total})
 		local free_ratio=$(get_percentage ${remaining} ${total})
-	 	color_print "GREEN" "Your have used ${used_ratio} of your storage space, with $((remaining/1024/1024/1024))GB(${free_ratio}) free space."
+	 	color_print "GREEN" "You have used ${used_ratio} of your storage space, with $((remaining/1024/1024/1024))GB(${free_ratio}) space remaining."
 		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 	fi	
 }
@@ -127,7 +127,6 @@ get_file_created_timestamp(){
   	hhmmss=$(echo ${uniq_name}  | cut -c 12-13):$(echo ${uniq_name} | cut -c 15-16):$(echo ${uniq_name} | cut -c 18-19)
 
   	rfc_fmt_date="${YYYYMMDD} ${hhmmss}"
-	echo "rfc_fmt_date" $rfc_fmt_date >> ./log/debug
   	echo $(date -d "${rfc_fmt_date}" +%s)
 }
 
@@ -207,8 +206,7 @@ upload_one_file() {
 	if [ ${file_size} -lt $((4*1024*1024)) ]; then
 		upload_small_file $1
 	else
-		echo "$file_size:"  $file_size >> ./log/debug
-		upload_large_file $1 ${file_size}
+		upload_large_file_by_chunks $1 ${file_size}
 	fi
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
@@ -224,7 +222,7 @@ update_file_upload_data() {
 	--arg utcts "$(date +%s)" \
 	'.file_path |= $file | .upload_time |= $date | .timestamp |= $utcts' \
 	> ./data/last_upload.json
-	echo $1 >> ./log/upload.history
+	echo `date`: $1 >> ./log/upload.history
 }
 
 # check_camera_idle_status
