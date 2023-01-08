@@ -74,7 +74,7 @@ create_video_root_folder() {
 			rm -f tmpfile	
 
 			color_print "GREEN" "Created folder ${video_root_folder} to store your video files successfully."
-			color_print "GREEN" "Configuration is done."
+			color_print "B_GREEN" "Configuration is done."
 			break
 		fi
 	else

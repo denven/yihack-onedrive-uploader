@@ -60,8 +60,9 @@ check_drive_free_space() {
 	fi
 
 	if [ $# -gt 0 ]; then 
-		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024)}')
-	 	color_print "GREEN" "You have used ${used_ratio} of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
+		local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
+		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
+	 	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
 		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 	fi	
 }
