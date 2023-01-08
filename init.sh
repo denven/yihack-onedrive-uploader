@@ -10,7 +10,7 @@ init_globals() {
 	camera_idled=false 
 	default_video_root_folder="yihack_videos"
 	query=''; resp=''; error=''; video_root_folder=''
-	auto_clean_threshold=90  # remaining space threshold
+	auto_clean_threshold=100  # disable the auto-clean feature
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
 	SD_RECORD_ROOT="/tmp/sd/record"
 
@@ -18,16 +18,19 @@ init_globals() {
 
 	color_print "GREEN" "Checking your OneDrive-uploader configuration..."
 	if [ ! -f ./config.json ]; then
-		echo '{ "grant_type": "", "client_id": "", "client_secret": "", "tenant_id": "" }' \
-		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "90", "enable_idle_transfer": "false"}' \
+		echo '{ "grant_type": "authorization_code", "client_id": "", "client_secret": "", "tenant_id": "" }' \
+		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "100", "enable_idle_transfer": "false"}' \
 		> config.json
 		color_print "BROWN" "A template config.json file is generated for you, please fill in it and try again."
 		exit 0
 	else
-		auto_clean_threshold=$(jq --raw-output '.auto_clean_threshold' config.json)	
-		if [ "${auto_clean_threshold}" = "null" ]; then
-			auto_clean_threshold=90
-		fi	
+		local threshold=$(jq --raw-output '.auto_clean_threshold' config.json)
+		if [ ! -z "${threshold}" ] && [ "${threshold}" != "null" ]; then
+			auto_clean_threshold=${threshold}
+		fi 
+		if [ ${auto_clean_threshold} -ge 50 ] && [ ${auto_clean_threshold} -lt 100 ]; then
+			color_print "BROWN" "You've enabled auto-clean feature when you use more than ${auto_clean_threshold}% of storage capacity."
+		fi 
 	fi
 }
 
@@ -37,7 +40,7 @@ test_onedrive_status() {
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1
 	else
-		check_drive_free_space "1st-time"
+		check_drive_free_space "--print"
 		color_print "GREEN" "Your OneDrive access is available."
 	fi
 }
@@ -49,7 +52,7 @@ create_video_root_folder() {
 
 	local need_create=true
 	if [ ! -z "${video_root_folder_id}" ] && [ "${video_root_folder_id}" != "null" ]; then
-		get_drive_item ${video_root_folder_id}
+		get_drive_items ${video_root_folder_id}
 		if [ -z "${error}" ] || [ "${error}" = "null" ]; then
 			need_create=false
 		fi

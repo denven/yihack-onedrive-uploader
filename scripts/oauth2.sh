@@ -131,4 +131,4 @@ manage_oauth2_tokens() {
 	else		
 		( refresh_oauth2_tokens ) &  # update tokens in subshell
 	fi	
-}
+} 

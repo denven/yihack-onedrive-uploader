@@ -13,7 +13,10 @@ manage_video_uploads() {
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
 	fi 
 
+	upload_start_ts=$(date +%s) 
 	while [ 1 ]; do
+		manage_space_auto_clean
+
 		if [ "${idle_transfer_mode}" = true ]; then
 			camera_idled=$(check_camera_idle_status)
 		fi
@@ -28,39 +31,74 @@ manage_video_uploads() {
 			else 
 				echo "All files were uploaded, wait for a new recorded video or picture file."
 				sleep 60 # check after one minute
-			fi 
+			fi 			
 		fi
 	done
 }
 
+manage_space_auto_clean() {
+	if [ $(get_elipsed_minutes ${upload_start_ts}) -ge 30 ]; then
+		get_drive_status
+		check_drive_free_space # do the auto-clean here
+		upload_start_ts=$(date +%s)
+	fi
+}
+
 # param: optional, when $1 is passed, it is the first-time check
 check_drive_free_space() {
-	if [ $# -eq 0 ]; then 
-	 	get_drive_status  # check periodically by default
-	fi
-
 	local used=$(echo ${resp} | jq '.quota.used')
 	local remaining=$(echo ${resp} | jq '.quota.remaining')
 	local total=$(echo ${resp} | jq '.quota.total')
 
-	# echo  $((100 - ${auto_clean_threshold}))
-	if [ $((remaining*100/total)) -lt $((100 - ${auto_clean_threshold})) ]; then 
-		remove_earliest_folders
+	local used_ratio=$(get_percentage ${used} ${total})
+	local free_ratio=$(get_percentage ${remaining} ${total})
+
+	local need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
+	if [ ${need_auto_clean} -eq 1 ] && [ $# -eq 0 ]; then
+		color_print "BROWN" "Your storage usage ${used_ratio} exceeds the specified threshold ${auto_clean_threshold}%, auto-clean started..."
+		remove_earliest_folder
 	fi
 
 	if [ $# -gt 0 ]; then 
-		local used_ratio=$(get_percentage ${used} ${total})
-		local free_ratio=$(get_percentage ${remaining} ${total})
-	 	color_print "GREEN" "You have used ${used_ratio} of your storage space, with $((remaining/1024/1024/1024))GB(${free_ratio}) space remaining."
+		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024)}')
+	 	color_print "GREEN" "You have used ${used_ratio} of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
 		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 	fi	
 }
 
-
-remove_earliest_folders() {
-	echo "remove_earliest_folders"
+# Remove one folder to release space.
+# Note that: This is a simple but non-aggressive auto clean solution to release space. 
+# 1. each time the uploader will remove the OLDEST uploaded folder ONLY, in order to keep more files still in OneDive
+# 2. the uploader will keep at least one folder to save the latest uploaded files
+# This means the auto-clean will be ignored when there is only one folder remaining in the root upload directory.
+# For massive or latest data clean, the user should release their space manually.
+remove_earliest_folder() {
+	local folder_name=""
+	for item_key in $(get_earliest_folder ${video_root_folder_id}); do 
+		if [ ${#item_key} -eq 14 ]; then 
+			folder_name=${item_key}
+			echo "Start to delete folder ${folder_name}"			
+		elif [ ${#item_key} -gt 14 ]; then  			
+			delete_drive_item ${item_key}
+			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
+				write_log "Deleted folder ${item_key}"
+				echo `date`": ${folder_name}" >> ./log/deletion.history
+			fi 
+		else
+			echo "You have only one folder remain in your root upload folder, auto-clean is ignored."			
+		fi 
+	done 
 }
 
+get_earliest_folder() {
+	get_drive_items $1 "-list" > /dev/null
+	local folders_cnt=$(echo $resp | jq '.value | length')
+	if [ ${folders_cnt} -gt 1 ]; then 
+		echo $resp | jq --raw-output '.value | .[0].name, .[0].id'
+	else
+		echo "Ignored"
+	fi 
+}
 
 check_camera_idle_status() {
 	local idled=false
@@ -110,8 +148,9 @@ build_media_file_index() {
 		| xargs ls -1rt > ./data/files.index  
 	else
 		local last_uploaded_file_ts=$(get_file_created_timestamp $1)
-		local current_time_ts=$(date +%s)
-		local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))
+		# local current_time_ts=$(date +%s)
+		# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
+		local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
 		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
 		-mmin -${eclipsed_mins} | xargs ls -1rt > ./data/files.index  
@@ -179,8 +218,8 @@ get_next_file() {
 		local file_name=$(parse_file_name ${last_uploaded})
 		local file_parent=$(parse_file_parent ${last_uploaded})
 
-		# check if next file in the same folder
-		next_file=$(find /tmp/sd/record/${file_parent} -type f | grep -A1 ${last_uploaded} | grep -v ${last_uploaded})
+		# check if there is a newer file in the same folder
+		next_file=$(ls -l /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | awk '{print $9}' | grep -v ${file_name})
 
 		# check newer file from another newer folder
 		if [ -z "${next_file}" ]; then
@@ -188,6 +227,8 @@ get_next_file() {
 			if [ ! -z "${next_folder}" ]; then 
 				next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	
 			fi		
+		else
+			next_file="/tmp/sd/record/${file_parent}/${next_file}"
 		fi 
 	fi 
 	echo ${next_file} >> ./log/debug
@@ -224,5 +265,3 @@ update_file_upload_data() {
 	> ./data/last_upload.json
 	echo `date`: $1 >> ./log/upload.history
 }
-
-# check_camera_idle_status

@@ -5,13 +5,14 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 
 ## Features
 - much easier to set up
-  - use a JSON file as the configuration file
+  - use a JSON file to configure
   - only few steps on your camera terminal
 - unattended upload your video (.mp4) and image (.jpg) files once set up successfully
-- both tenant and personal Microsoft account are supported
+- both personal and tenant Microsoft accounts are supported
+- safe auto-clean of your earliest files when storage reaches the specified threshold
 
 ## Supported camera models
-> Yi cameras hacked with the same file hiearacy or builtin applications are more likely to be supported. Anyway, your own sperate tests are necessary before you use it. I've tested on my own camera.
+> Yi cameras hacked with the same file hiearacy or builtin applications are more likely to be supported. Anyway, your own separate tests are necessary before you use it. I've tested on my own camera.
   - [x] model y201c(Yi 1080p Dome BFUS) with firmware 4.6.0.0A_201908271549 and yi-hack-MStar 0.4.7 by [denven](https://github.com/denven)
   - [ ] welcome to test it on your camera :smile:
 
@@ -55,36 +56,28 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
   "client_secret": "dFE8Q~bUtscYyoTUCxt3RLawrfsnyVGARFhGdcH7",
   "tenant_id": "e2a801f7-46fe-4dcf-91b7-6d4409c7760e",
   "scope": "https://graph.microsoft.com/.default",
-  "video_root_folder": "yihack_videos"
+  "video_root_folder": "yihack_videos",
+  "auto_clean_threshold": "100",
+  "enable_idle_transfer": "false"
 }
 ```
-- configuration key and value description
+
   
-|     Configuration key   |      default value      |     Required       |     Description       |
-| :---------------------: | :---------------------: | :----------------: | :----------------: |
-|    grant_type | authorization_code | true |
-|    client_id | "" | true | fill in with your data
-|    client_secret | "" | true | fill in with your data
-|    tenant_id | "" | true | for person account, set it as "consumers"; for tenant account, set a specific tenant id.
-|    scope | https://graph.microsoft.com/.default | true |
-|    video_root_folder | yihack_videos | true | name string without white spaces
-|    auto_clean_threshold | 90 | false | not supported yet
-|    enable_idle_transfer | false | false |
+|     Configuration key   |      Default value      |    Description      |
+| :---------------------: | :---------------------: |  :----------------: |
+|    grant_type | authorization_code | 
+|    client_id | "" |  fill in with your data
+|    client_secret | "" | fill in with your data
+|    tenant_id | "" | for personal account, set it as "consumers"; for tenant account, set a specific tenant id
+|    scope | https://graph.microsoft.com/.default | not required
+|    video_root_folder | yihack_videos |  name string without white spaces
+|    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
+|    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 
 
-1. upload the code and `config.json` files to your camera sd card via `ssh` with `root` account or a FTP tool, target path: `/tmp/sd/yi-hack`, make sure you've uploaded the required files to `/tmp/sd/yi-hack/onedrive`:
-   - `init.sh`
-   - `config.json`
-   - `scripts` directory: with 4 shell script files inside: `api.sh`, `oauth2.sh`, `upload.sh`, `utils.sh`
-```bash
-cd /tmp/sd/yi-hack
-/tmp/sd/yi-hack # ls -R onedrive/
-onedrive/:
-config.json  init.sh      scripts
-
-onedrive/scripts:
-api.sh     oauth2.sh  upload.sh  utils.sh
-```
+3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
+   - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
+   - upload your own `config.json`file, `init.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
 
 4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
 5. run the entry Shell script `init.sh` to complete the application authorization grant flow
@@ -100,8 +93,8 @@ cd /tmp/sd/yihack/onedrive/
 ![Successful configuration](./screenshots/successful_configuration.png)
 
 
-5. optional: reboot your camera
+6. optional: reboot your camera
 
 
 ## Todo list
-- [ ] Auto-clean the oldest uploaded folders before the drive space is exhausted
+- [x] Auto-clean the oldest uploaded folders before the drive space is exhausted

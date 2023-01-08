@@ -10,7 +10,7 @@ enable_auto_start() {
 	[ -f "${auto_start_file}" ] || touch ${auto_start_file} 
 
 	if [ -z "$(grep 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh' ${auto_start_file})" ]; then 
-		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh &' >> ${auto_start_file}
+		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh > ./log/terminal &' >> ${auto_start_file}
 	fi 
 }
 
@@ -20,6 +20,12 @@ run_singleton() {
 			kill -9 $pid &> /dev/null
 		fi  
 	done
+}
+
+# param: $1=past_ts
+get_elipsed_minutes() {
+	current_ts=$(date +%s)
+	echo $(((${current_ts}-$1)/60))
 }
 
 color_print() {
@@ -90,6 +96,14 @@ get_percentage() {
 	echo $1 $2 | awk '{printf "%.2f%%", $1/$2*100}'
 }
 
+
+# params: $1=free_ratio, $2=threshold_to_clean
+# return 0 or 1(need to start auto-clean)
+evaluate_auto_clean() {
+	echo $1 $2 | awk '{if (($1 <= 100-$2) && ($2 >= 50)) {print 1} else {print 0}}'
+	# echo $1 $2 | awk '{if (($1 <= 100-$2)) {print 1} else {print 0}}'
+}
+
 write_log() {
 	echo `date`": $*" >> ./log/logs
 	# echo `date`": $*" | tee -a logs # to be tested
@@ -101,7 +115,7 @@ process_log_file() {
 		if [ $(ls -l ${log_file} | awk '{print $5}') -gt 1048576 ] && [ -z $(echo "${log_file}" | grep "old") ]; then
 			mv ${log_file} ${log_file}.old 
 			touch ${log_file} 
-		fi
+		fi 
 	done 
 }
 

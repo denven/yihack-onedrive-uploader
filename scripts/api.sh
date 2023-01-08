@@ -4,10 +4,11 @@ send_api_request() {
 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
 	resp=`eval $query` # | jq  --raw-output '.error.message'`
 	# echo -e "$query \n $resp"
+	api_error_code=$(echo ${resp} | jq --raw-output '.error.code')
 	api_error_message=$(echo ${resp} | jq --raw-output '.error.message')	
 	if [ ! -z "${api_error_message}" ] && [ "${api_error_message}" != "null" ]; then
 		error=$api_error_message
-		write_log "$@, Error: $api_error_message"
+		write_log "$@, Error: $api_error_message, Code: ${api_error_code}"
 	else
 		error=''
 		color_print "GREEN" "Success: $*"
@@ -41,9 +42,13 @@ delete_drive_item() {
 	send_api_request "delete_drive_item" $@
 }
 
-# param: item_id
-get_drive_item() {
-	query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1'"
+# param: $1=item_id, $2="details"
+get_drive_items() {
+	query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1'" # query item only
+	if [ $# -gt 1 ]; then
+		query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1/children?select=id,name,size&top=2&orderby=lastModifiedDateTime'"	
+		# query=${query}"children?select=id,name,size&top=2&orderby=lastModifiedDateTime'"	
+	fi 
 	send_api_request "get_drive_item" $@
 }
 
@@ -91,7 +96,7 @@ upload_large_file() {
 		-H "Content-Range: bytes 0-$((${2}-1))/${2}" \
 		> /dev/null
 
-		# there is 2 errors warning here when use PUT instead of POST:
+		# there are 2 errors warning here when use PUT instead of POST:
 		# 1. a session url error after the last chunk is transimitted
 		# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
 		# 2. curl: option --data-binary: out of memory
@@ -113,7 +118,7 @@ upload_large_file_by_chunks() {
 	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
-	color_print "GREEN" "upload_large_file_by_chunks $2 bytes"
+	color_print "GREEN" "upload_large_file_by_chunks $1, size: $2 bytes"
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
@@ -143,4 +148,4 @@ upload_large_file_by_chunks() {
 
 		curl -s -k -L -X DELETE ${upload_url}  # delete session after upload
 	fi
-}
+}  
