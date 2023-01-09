@@ -1,4 +1,12 @@
 # OneDrive-uploader for Yi IP Cameras
+
+### To visitors and cloners:
+- A star 🌟 is the best encouragement to me if this repository helps you
+- Any issue 🐛 is welcome if you find a bug or have a question to ask
+- Test feedback on our camera is invaluable to all
+
+
+
 This repository is inspired by [roleoroleo](https://github.com/roleoroleo)'s [yi-hack-MStar.gdrive uploader](https://github.com/roleoroleo/yi-hack-MStar.gdrive). The gdrive uploader does provide some convenience, however, my Google drive has only 15GB space shared with Gmail and other account applications, and it is very easy to get storage fully packed with uploaded media files. Fortunately, I've subscribed Microsoft 365 Developer Program which provides 5TB storage space. I think uploading files to OneDrive is a better option for me.
 
 If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Developer Program, you will get more storage space, which can allow you to store your camera videos and pictures to it other than paying an expensive manufacturer's storage premium plan.
