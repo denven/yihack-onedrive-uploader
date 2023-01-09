@@ -16,6 +16,7 @@ init_globals() {
 
 	mkdir -p data log # prepare folders to store upload info and logs
 
+	write_log "OneDive Uploader started..."
 	color_print "GREEN" "Checking your OneDrive-uploader configuration..."
 	if [ ! -f ./config.json ]; then
 		echo '{ "grant_type": "authorization_code", "client_id": "", "client_secret": "", "tenant_id": "" }' \
@@ -35,12 +36,11 @@ init_globals() {
 }
 
 test_onedrive_status() {		
-	get_drive_status # test drive access
+	check_drive_free_space "--print"
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1
-	else
-		check_drive_free_space "--print"
+	else		
 		color_print "GREEN" "Your OneDrive access is available."
 	fi
 }
@@ -96,10 +96,6 @@ init() {
 	create_video_root_folder
 
 	manage_video_uploads
-
-	# while [ 1 ]; do
-	# 	sleep 60
-	# done 	
 	exit 0
 }	
 

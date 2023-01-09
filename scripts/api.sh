@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# param: $1="--retry" is a case for query once more when last query fails
 send_api_request() {
 	query="${query} -H 'Authorization: Bearer ${access_token}'"	
 	resp=`eval $query` # | jq  --raw-output '.error.message'`
@@ -9,6 +10,11 @@ send_api_request() {
 	if [ ! -z "${api_error_message}" ] && [ "${api_error_message}" != "null" ]; then
 		error=$api_error_message
 		write_log "$@, Error: $api_error_message, Code: ${api_error_code}"
+		if [ "${api_error_code}" = "InvalidAuthenticationToken" ] && [ $1 != "--retry" ]; then 
+			write_log "Token invalid or expired, start to renew the tokens..."
+			refresh_oauth2_tokens
+			send_api_request "--retry" $@
+		fi 
 	else
 		error=''
 		color_print "GREEN" "Success: $*"
@@ -118,7 +124,7 @@ upload_large_file_by_chunks() {
 	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
-	color_print "GREEN" "upload_large_file_by_chunks $1, size: $2 bytes"
+	color_print "GREEN" "upload_large_file_by_chunks $1, $(get_human_readble_size ${file_size})"
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	

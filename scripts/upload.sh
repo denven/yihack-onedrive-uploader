@@ -13,21 +13,28 @@ manage_video_uploads() {
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
 	fi 
 
-	upload_start_ts=$(date +%s) 
-	while [ 1 ]; do
-		manage_space_auto_clean
+	# upload_start_ts=$(date +%s) 
+	auto_clean_done=false
+	check_drive_free_space "--clean"  # first-time check before uploading
 
+	while [ 1 ]; do		
 		if [ "${idle_transfer_mode}" = true ]; then
 			camera_idled=$(check_camera_idle_status)
 		fi
 
+		# upload file, check and do auto-clean
 		if [ "${idle_transfer_mode}" != true ] || [ ${camera_idled} = true ]; then
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
 				echo "Start to upload ${file}"
-				upload_one_file ${file}		
-				process_log_file
-				sleep 10 # send file every 10s
+				upload_one_file ${file}	
+
+				# periodically check and do auto-clean
+				auto_clean_done=false
+				check_drive_free_space "--clean"
+
+				process_log_file 
+				sleep 10 # send file every 10s					
 			else 
 				echo "All files were uploaded, wait for a new recorded video or picture file."
 				sleep 60 # check after one minute
@@ -36,16 +43,21 @@ manage_video_uploads() {
 	done
 }
 
+# check space every 30 minutes, it is not used right now
 manage_space_auto_clean() {
-	if [ $(get_elipsed_minutes ${upload_start_ts}) -ge 30 ]; then
-		get_drive_status
-		check_drive_free_space # do the auto-clean here
-		upload_start_ts=$(date +%s)
+	local eclipsed_mins=$(get_elipsed_minutes ${upload_start_ts})
+	if [ $((${eclipsed_mins}%30)) -eq 0 ]; then
+		check_drive_free_space "--clean" # do the auto-clean here
+		if [ ${eclipsed_mins} -gt 0 ]; then 
+			upload_start_ts=$(date +%s)
+		fi 
 	fi
 }
 
-# param: optional, when $1 is passed, it is the first-time check
+# param: $1: --print or --clean
 check_drive_free_space() {
+	get_drive_status
+
 	local used=$(echo ${resp} | jq '.quota.used')
 	local remaining=$(echo ${resp} | jq '.quota.remaining')
 	local total=$(echo ${resp} | jq '.quota.total')
@@ -53,40 +65,46 @@ check_drive_free_space() {
 	local used_ratio=$(get_percentage ${used} ${total})
 	local free_ratio=$(get_percentage ${remaining} ${total})
 
-	local need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
-	if [ ${need_auto_clean} -eq 1 ] && [ $# -eq 0 ]; then
-		color_print "BROWN" "Your storage usage ${used_ratio} exceeds the specified threshold ${auto_clean_threshold}%, auto-clean started..."
-		remove_earliest_folder
-	fi
-
-	if [ $# -gt 0 ]; then 
+	if [ $1 = "--print" ]; then 
 		local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 	 	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
 		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 	fi	
+
+	if [ $1 = "--clean" ]; then		
+		local need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
+		if [ ${need_auto_clean} -eq 1 ] && [ ${auto_clean_done} = false ]; then
+			color_print "BROWN" "Your storage usage ${used_ratio} exceeds the specified threshold ${auto_clean_threshold}%, auto-clean started..."
+			remove_earliest_folder
+			check_drive_free_space "--clean" 
+		elif [ ${auto_clean_done} = true ]; then
+			color_print "B_GREEN" "Bravo! Auto-clean task is done, you currently have ${free_ratio} free space."
+		fi
+	fi
 }
 
 # Remove one folder to release space.
 # Note that: This is a simple but non-aggressive auto clean solution to release space. 
-# 1. each time the uploader will remove the OLDEST uploaded folder ONLY, in order to keep more files still in OneDive
-# 2. the uploader will keep at least one folder to save the latest uploaded files
+# 1. each time the uploader will remove the OLDEST uploaded folders ONLY;
+# 2. the uploader will keep at least one folder to ensure the latest uploaded files are not deleted;
 # This means the auto-clean will be ignored when there is only one folder remaining in the root upload directory.
-# For massive or latest data clean, the user should release their space manually.
+# For massive or latest data clean, the user should delete their folder(s) and files manually.
 remove_earliest_folder() {
-	local folder_name=""
+	local folder_to_delete=""
 	for item_key in $(get_earliest_folder ${video_root_folder_id}); do 
 		if [ ${#item_key} -eq 14 ]; then 
-			folder_name=${item_key}
-			echo "Start to delete folder ${folder_name}"			
+			folder_to_delete=${item_key}
+			echo "Start to delete folder ${folder_to_delete}"			
 		elif [ ${#item_key} -gt 14 ]; then  			
 			delete_drive_item ${item_key}
 			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 				write_log "Deleted folder ${item_key}"
-				echo `date`": ${folder_name}" >> ./log/deletion.history
+				echo `date`": ${folder_to_delete}" >> ./log/deletion.history
 			fi 
 		else
-			echo "You have only one folder remain in your root upload folder, auto-clean is ignored."			
+			echo "You have only one folder remain in your root upload folder, auto-clean is ignored."	
+			auto_clean_done=true		
 		fi 
 	done 
 }
@@ -128,13 +146,13 @@ get_one_file_to_upload() {
 		file=$(cat ./data/files.index | awk 'FNR <= 1')
 	else 
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
-		echo "found last_upload.json" $last_uploaded >> ./log/debug
+		echo "Found last uploaded file:" $last_uploaded >> ./log/next_file
 
 		if [ ! -f "${last_uploaded}" ]; then 
 			build_media_file_index ${last_uploaded}  # when last uploaded file has been deleted
 			file=$(cat ./data/files.index | awk 'FNR <= 1')
 		else 
-			echo "check next file by last_upload.json" ${last_uploaded} >> ./log/debug
+			echo "Searching the next file to upload..." >> ./log/next_file
 			file=$(get_next_file ${last_uploaded}) # last uploaded file still exists		
 		fi 
 	fi 
@@ -232,7 +250,7 @@ get_next_file() {
 			next_file="/tmp/sd/record/${file_parent}/${next_file}"
 		fi 
 	fi 
-	echo ${next_file} >> ./log/debug
+	echo "Found the next file to upload: ${next_file}" >> ./log/next_file
 	echo ${next_file}
 }
 
