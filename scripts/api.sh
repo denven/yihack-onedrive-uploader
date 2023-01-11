@@ -24,7 +24,6 @@ send_api_request() {
 get_drive_status() {	
 	query='curl -s -k -L -X GET '${DRIVE_BASE_URI}
 	send_api_request "get_drive_status"	
-	echo $resp | jq '.quota' > ./data/drive_status.json 
 	drive_id=$(echo $resp | jq '.id')
 }
 
@@ -128,7 +127,12 @@ upload_large_file_by_chunks() {
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
-		local chunk_index=0; chunk_size=5242880 # 5Mb
+
+		# Note: from the docs, size of each chunk MUST be a multiple of 320 KiB (327,680 bytes)
+		# Since the max size of a mp4 file is less than 11MB, setting chunk size as 5.625M
+		# will let a large file be transfered in only 2 chunks	
+		# 320KB*18 = 327680*18 = 5898240 = 5.625M
+		local chunk_index=0; chunk_size=$((327680*18))
 		local range_start=0; range_end=0; range_length=0
 
 		while [ $((${chunk_index}*${chunk_size})) -lt $2 ]; do
@@ -140,18 +144,22 @@ upload_large_file_by_chunks() {
 			fi
 			range_length=$((${range_end}-${range_start}+1))
 
-			dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null |
+			# do not use dd to copy file data as curl's input 
+			# dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null |
+			# -H "Transfer-Encoding: chunked" \
+			# -o /dev/null \
 			curl -s -k -L -X PUT ${upload_url} \
-			--data-binary "${filename}"@- \
-			-H "Transfer-Encoding: chunked" \
+			--data-binary "${filename}"@"$1" \
+			-H "Content-Type: application/octet-stream"	\
 			-H "Content-Length: ${range_length}" \
 			-H "Content-Range: bytes ${range_start}-${range_end}/${2}" \
-			-o /dev/null  
+			&> /dev/null
 			# > /dev/null 2>&1
 
 			chunk_index=$((${chunk_index}+1))
 		done 
 
 		curl -s -k -L -X DELETE ${upload_url}  # delete session after upload
+		color_print "GREEN" "Success: upload_large_file_by_chunks $1"
 	fi
 }  

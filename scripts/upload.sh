@@ -65,7 +65,8 @@ check_drive_free_space() {
 	local used_ratio=$(get_percentage ${used} ${total})
 	local free_ratio=$(get_percentage ${remaining} ${total})
 
-	if [ $1 = "--print" ]; then 
+	if [ $1 = "--print" ]; then 	
+		echo $resp | jq '.quota' > ./data/drive_status.json
 		local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 	 	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
@@ -80,6 +81,8 @@ check_drive_free_space() {
 			check_drive_free_space "--clean" 
 		elif [ ${auto_clean_done} = true ]; then
 			color_print "B_GREEN" "Bravo! Auto-clean task is done, you currently have ${free_ratio} free space."
+		else 
+			false # do nothing (do not start or haven't started auto-clean task)
 		fi
 	fi
 }
