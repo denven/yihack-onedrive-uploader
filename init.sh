@@ -36,7 +36,22 @@ init_globals() {
 }
 
 test_onedrive_status() {		
-	check_drive_free_space "--print"
+	get_drive_status
+
+	local used=$(echo ${resp} | jq '.quota.used')
+	local remaining=$(echo ${resp} | jq '.quota.remaining')
+	local total=$(echo ${resp} | jq '.quota.total')
+
+	local used_ratio=$(get_percentage ${used} ${total})
+	local free_ratio=$(get_percentage ${remaining} ${total})
+
+	echo $resp | jq '.quota' > ./data/drive_status.json
+	local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
+	local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
+
+	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
+	color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
+
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
 		exit 1

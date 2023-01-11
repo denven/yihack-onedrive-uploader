@@ -14,9 +14,7 @@ manage_video_uploads() {
 	fi 
 
 	# upload_start_ts=$(date +%s) 
-	auto_clean_done=false
-	check_drive_free_space "--clean"  # first-time check before uploading
-
+	clean_drive_space # first-time to check and do the clean
 	while [ 1 ]; do		
 		if [ "${idle_transfer_mode}" = true ]; then
 			camera_idled=$(check_camera_idle_status)
@@ -27,14 +25,10 @@ manage_video_uploads() {
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
 				echo "Start to upload ${file}"
-				upload_one_file ${file}	
-
-				# periodically check and do auto-clean
-				auto_clean_done=false
-				check_drive_free_space "--clean"
-
+				upload_one_file ${file}					
+				clean_drive_space  # periodically check and do auto-clean
 				process_log_file 
-				sleep 10 # send file every 10s					
+				sleep 2 # send file every 2s					
 			else 
 				echo "All files were uploaded, wait for a new recorded video or picture file."
 				sleep 60 # check after one minute
@@ -43,48 +37,43 @@ manage_video_uploads() {
 	done
 }
 
-# check space every 30 minutes, it is not used right now
+# check space every 30 minutes, currently not use this way
 manage_space_auto_clean() {
 	local eclipsed_mins=$(get_elipsed_minutes ${upload_start_ts})
 	if [ $((${eclipsed_mins}%30)) -eq 0 ]; then
-		check_drive_free_space "--clean" # do the auto-clean here
+		clean_drive_space  # do the auto-clean here
 		if [ ${eclipsed_mins} -gt 0 ]; then 
 			upload_start_ts=$(date +%s)
 		fi 
 	fi
 }
 
-# param: $1: --print or --clean
-check_drive_free_space() {
-	get_drive_status
 
-	local used=$(echo ${resp} | jq '.quota.used')
-	local remaining=$(echo ${resp} | jq '.quota.remaining')
-	local total=$(echo ${resp} | jq '.quota.total')
+# note this function call takes 3 seconds or more
+clean_drive_space() {
+	local used; local remaining; local total
+	local used_ratio; local free_ratio; local need_auto_clean
+	local auto_clean_done=false 
+	while [ 1 ]; do 
+		get_drive_status
+		used=$(echo ${resp} | jq '.quota.used')
+		remaining=$(echo ${resp} | jq '.quota.remaining')
+		total=$(echo ${resp} | jq '.quota.total')
 
-	local used_ratio=$(get_percentage ${used} ${total})
-	local free_ratio=$(get_percentage ${remaining} ${total})
+		used_ratio=$(get_percentage ${used} ${total})
+		free_ratio=$(get_percentage ${remaining} ${total})
+		need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
 
-	if [ $1 = "--print" ]; then 	
-		echo $resp | jq '.quota' > ./data/drive_status.json
-		local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
-		local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
-	 	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
-		color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
-	fi	
-
-	if [ $1 = "--clean" ]; then		
-		local need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
 		if [ ${need_auto_clean} -eq 1 ] && [ ${auto_clean_done} = false ]; then
 			color_print "BROWN" "Your storage usage ${used_ratio} exceeds the specified threshold ${auto_clean_threshold}%, auto-clean started..."
-			remove_earliest_folder
-			check_drive_free_space "--clean" 
+			remove_earliest_folder # set $auto_clean_done to true when done
 		elif [ ${auto_clean_done} = true ]; then
-			color_print "B_GREEN" "Bravo! Auto-clean task is done, you currently have ${free_ratio} free space."
+			color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio} free space."
+			break # auto clean is completed
 		else 
-			false # do nothing (do not start or haven't started auto-clean task)
-		fi
-	fi
+			break # do nothing (do not start or haven't started auto-clean)
+		fi		
+	done 
 }
 
 # Remove one folder to release space.
