@@ -79,16 +79,17 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    tenant_id | "" | for personal account, set it as "consumers"; for tenant account, set a specific tenant id
 |    scope | https://graph.microsoft.com/.default | not required
 |    video_root_folder | yihack_videos |  name string without white spaces
+|    upload_video_only | true | not required; set it false will upload *.jpg files in the record folders
 |    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 
 
-3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
+1. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
    - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
    - upload your own `config.json`file, `init.sh`, `stop.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
 
-4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
-5. run the entry Shell script `init.sh` to complete the application authorization grant flow
+2. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
+3. run the entry Shell script `init.sh` to complete the application authorization grant flow
 
 ```bash
 cd /tmp/sd/yihack/onedrive/
@@ -110,14 +111,14 @@ cd /tmp/sd/yihack/onedrive/
 cd /tmp/sd/yi-hack/onedrive
 ./stop.sh
 ```
-- You might have messed up the configuration or you are not content the running situation, you want to start again from the beginning.
+- You might have messed up the configuration or you are not content with the running situation, you want to start again from the beginning.
   - first, stop the uploader first by following above
-  - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to continue your uploading without any repetitive uploads).
+  - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to resume your uploading without any repetitive uploads).
 ```bash
 rm -rf data
 rm -rm log
 ```
-  - If you want to setup with another OneDrive account( or Azure application data), you can delete `config.json` or replace it with a new one as well.
+  - If you want to setup with another OneDrive account (or Azure application data), you can delete or edit your current `config.json`, or replace it with a new one as well.
 
 
 

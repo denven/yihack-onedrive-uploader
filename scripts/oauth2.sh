@@ -115,7 +115,7 @@ manage_oauth2_tokens() {
 			refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
 			if [ ! -z $access_token ] && [ ! -z $refresh_token ]; then 
 				color_print "GREEN" "Found an existing refresh token, start to test its availability..."
-				refresh_oauth2_tokens "test"
+				refresh_oauth2_tokens "--test"
 			fi		
 			if [ -z $error ] || [ "$error" = "null" ]; then
 				need_re_assign=false

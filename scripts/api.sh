@@ -12,7 +12,7 @@ send_api_request() {
 		write_log "$@, Error: $api_error_message, Code: ${api_error_code}"
 		if [ "${api_error_code}" = "InvalidAuthenticationToken" ] && [ $1 != "--retry" ]; then 
 			write_log "Token invalid or expired, start to renew the tokens..."
-			refresh_oauth2_tokens
+			refresh_oauth2_tokens "--onetime"
 			send_api_request "--retry" $@
 		fi 
 	else

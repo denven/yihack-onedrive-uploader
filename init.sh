@@ -10,6 +10,7 @@ init_globals() {
 	camera_idled=false 
 	default_video_root_folder="yihack_videos"
 	query=''; resp=''; error=''; video_root_folder=''
+	upload_video_only=true # upload mp4 files only
 	auto_clean_threshold=100  # disable the auto-clean feature
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
 	SD_RECORD_ROOT="/tmp/sd/record"
@@ -25,6 +26,11 @@ init_globals() {
 		color_print "BROWN" "A template config.json file is generated for you, please fill in it and try again."
 		exit 0
 	else
+		local upload_file_type=$(jq --raw-output '.upload_video_only' config.json)
+		if [ ! -z "${upload_file_type}" ] && [ "${upload_file_type}" != "null" ]; then
+			upload_video_only=${upload_file_type}
+		fi
+
 		local threshold=$(jq --raw-output '.auto_clean_threshold' config.json)
 		if [ ! -z "${threshold}" ] && [ "${threshold}" != "null" ]; then
 			auto_clean_threshold=${threshold}

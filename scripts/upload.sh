@@ -46,6 +46,7 @@ manage_drive_auto_clean() {
 	local used; local total; local used_ratio
 	local need_auto_clean; local auto_clean_done=false 
 
+	write_log "Start the auto-clean monitor..."
 	while [ 1 ]; do 
 		get_drive_status
 		used=$(echo ${resp} | jq '.quota.used')
@@ -63,7 +64,7 @@ manage_drive_auto_clean() {
 			break # do nothing (do not start or haven't started auto-clean)
 		fi		
 
-		sleep $((30*60)) # check auto-clean every 30 minutes
+		sleep $((10*60)) # check auto-clean every 10 minutes
 	done 
 }
 
@@ -147,28 +148,50 @@ get_one_file_to_upload() {
 # return: files list by modified time from past to current
 build_media_file_index() {	
 	if [ $# -eq 0 ]; then
-		echo "Build files uploading index..." >> log/logs
+		write_log "Build files uploading index..."
 		# files only sort by mtime in separate direcotries, cannot assure be sorted all by file mtime
 		# find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
 		# ls -1rtR /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
-		ls -1R /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
+		if [ ${upload_video_only} != true ]; then  
+			ls -1R /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
+		else 
+			ls -1R /tmp/sd/record/*/*.mp4 > ./data/files.index 
+		fi 
 	else
-		# local last_uploaded_file_ts=$(get_file_created_timestamp $1)
-		# local current_time_ts=$(date +%s)
-		# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
-		# local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
+		write_log "Build a new uploading index for files created later than file ${1}..."
 
-		echo "Build a new uploading index for files created later than file ${1}..." >> log/logs
-		# Use -newer FILE is simple
-		# find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
-		# -mmin -${eclipsed_mins} | xargs ls -1rt > ./data/files.index  # not fully sorted by mtime (by directory first)
+		local file_parent=$(parse_file_parent ${last_uploaded}) 
+		if [ ! -d ${file_parent} ]; then 
+			local last_uploaded_file_ts=$(get_file_created_timestamp $1)
+			local current_time_ts=$(date +%s)
+			local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
+			local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
-		local file_parent=$(parse_file_parent ${last_uploaded})
-		find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
-		awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
-		> ./data/files.index
+			if [ ${upload_video_only} != true ]; then 
+				find /tmp/sd/record/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
+				> ./data/files.index 
+			else 
+				find /tmp/sd/record/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
+				> ./data/files.index
+			fi 
+		else 
+			if [ ${upload_video_only} != true ]; then 
+				find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
+				> ./data/files.index
+			else 
+				find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
+				> ./data/files.index
+			fi
+		fi
+
+		rm data/last_upload.json  # need to create new last_upload.json file
 	fi 
-	echo "Build the files uploading index successfully." >> ./log/logs
+
+	write_log "Build the files uploading index successfully."
 	using_fileindex=true
 }
 
@@ -244,17 +267,26 @@ get_next_file() {
 		# check if there is a newer file in the same folder (using `ls -1` can save awk '{print $9}')
 		# this will return a filename without the path included
 		echo "Search next file from the same directory: ${file_parent}" >> ./log/next_file
-		next_file=$(ls -l /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | awk '{print $9}' | grep -v ${file_name})
+		if [ ${upload_video_only} != true ]; then 
+			next_file=$(ls -1 /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
+			if [ ! -z "${next_file}" ]; then 
+				next_file="/tmp/sd/record/${file_parent}/${next_file}"
+			fi 
+		else
+			next_file=$(ls -1 /tmp/sd/record/${file_parent}/*.mp4 | grep -A1 ${file_name} | grep -v ${file_name}) # full path
+		fi
 		
-		if [ -z "${next_file}" ]; then
-			# check newer file from another newer folder
+		# check newer file from another newer folder
+		if [ -z "${next_file}" ]; then			
 			local next_folder=$(get_next_folder ${file_parent})
 			echo "Can not find a file to upload, search another folder: ${next_folder}" >> ./log/next_file
 			if [ ! -z "${next_folder}" ]; then 
-				next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
+				if [ ${upload_video_only} != true ]; then 
+					next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
+				else 
+					next_file=$(find ${next_folder} -type f -iname \*.mp4| awk 'FNR <= 1')	# first file in the folder with full path
+				fi
 			fi		
-		else
-			next_file="/tmp/sd/record/${file_parent}/${next_file}"
 		fi 
 	fi 
 
