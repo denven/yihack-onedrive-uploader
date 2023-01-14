@@ -85,7 +85,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 
 3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
    - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
-   - upload your own `config.json`file, `init.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
+   - upload your own `config.json`file, `init.sh`, `stop.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
 
 4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
 5. run the entry Shell script `init.sh` to complete the application authorization grant flow
@@ -102,6 +102,23 @@ cd /tmp/sd/yihack/onedrive/
 
 
 6. optional: reboot your camera
+
+## Maintenance 
+
+- In case you run into an issue or you just want to stop the uploader, run the `stop.sh` script to kill the running uploader.
+```bash
+cd /tmp/sd/yi-hack/onedrive
+./stop.sh
+```
+- You might have messed up the configuration or you are not content the running situation, you want to start again from the beginning.
+  - first, stop the uploader first by following above
+  - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to continue your uploading without any repetitive uploads).
+```bash
+rm -rf data
+rm -rm log
+```
+  - If you want to setup with another OneDrive account( or Azure application data), you can delete `config.json` or replace it with a new one as well.
+
 
 
 ## Todo list
