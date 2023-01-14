@@ -42,14 +42,14 @@ test_onedrive_status() {
 	local remaining=$(echo ${resp} | jq '.quota.remaining')
 	local total=$(echo ${resp} | jq '.quota.total')
 
-	local used_ratio=$(get_percentage ${used} ${total})
-	local free_ratio=$(get_percentage ${remaining} ${total})
+	local used_ratio=$(get_percent ${used} ${total})
+	local free_ratio=$(get_percent ${remaining} ${total})
 
 	echo $resp | jq '.quota' > ./data/drive_status.json
 	local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 	local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 
-	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}) of your storage space, with ${remain_gb}GB(${free_ratio}) space remaining."
+	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}%) of your storage space, with ${remain_gb}GB(${free_ratio}%) space remaining."
 	color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
 
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then

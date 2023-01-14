@@ -13,8 +13,12 @@ manage_video_uploads() {
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
 	fi 
 
-	# upload_start_ts=$(date +%s) 
-	clean_drive_space # first-time to check and do the clean
+	# do the auto clean in a subshell when this feature is enabled
+	if [ "${auto_clean_threshold}" -ge 50 ] && [ "${auto_clean_threshold}" -lt 100 ]; then 
+		( manage_drive_auto_clean ) &  
+	fi 
+
+	# the main loop of files upload 
 	while [ 1 ]; do		
 		if [ "${idle_transfer_mode}" = true ]; then
 			camera_idled=$(check_camera_idle_status)
@@ -25,8 +29,7 @@ manage_video_uploads() {
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
 				echo "Start to upload ${file}"
-				upload_one_file ${file}					
-				clean_drive_space  # periodically check and do auto-clean
+				upload_one_file ${file}
 				process_log_file 
 				sleep 2 # send file every 2s					
 			else 
@@ -37,35 +40,21 @@ manage_video_uploads() {
 	done
 }
 
-# check space every 30 minutes, currently not use this way
-manage_space_auto_clean() {
-	local eclipsed_mins=$(get_elipsed_minutes ${upload_start_ts})
-	if [ $((${eclipsed_mins}%30)) -eq 0 ]; then
-		clean_drive_space  # do the auto-clean here
-		if [ ${eclipsed_mins} -gt 0 ]; then 
-			upload_start_ts=$(date +%s)
-		fi 
-	fi
-}
 
+# periodically check and do drive auto-clean
+manage_drive_auto_clean() {
+	local used; local total; local used_ratio
+	local need_auto_clean; local auto_clean_done=false 
 
-# note this function call takes 3 seconds or more
-clean_drive_space() {
-	local used; local remaining; local total
-	local used_ratio; local free_ratio; local need_auto_clean
-	local auto_clean_done=false 
 	while [ 1 ]; do 
 		get_drive_status
 		used=$(echo ${resp} | jq '.quota.used')
-		remaining=$(echo ${resp} | jq '.quota.remaining')
 		total=$(echo ${resp} | jq '.quota.total')
 
-		used_ratio=$(get_percentage ${used} ${total})
-		free_ratio=$(get_percentage ${remaining} ${total})
-		need_auto_clean=$(evaluate_auto_clean ${free_ratio} ${auto_clean_threshold})
-
+		used_ratio=$(get_percent ${used} ${total})
+		local need_auto_clean=$(evaluate_auto_clean ${used_ratio} ${auto_clean_threshold})
 		if [ ${need_auto_clean} -eq 1 ] && [ ${auto_clean_done} = false ]; then
-			color_print "BROWN" "Your storage usage ${used_ratio} exceeds the specified threshold ${auto_clean_threshold}%, auto-clean started..."
+			color_print "BROWN" "Your storage usage (${used_ratio}%) has exceeded your specified threshold ${auto_clean_threshold}%, auto-clean started..."
 			remove_earliest_folder # set $auto_clean_done to true when done
 		elif [ ${auto_clean_done} = true ]; then
 			color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio} free space."
@@ -73,6 +62,8 @@ clean_drive_space() {
 		else 
 			break # do nothing (do not start or haven't started auto-clean)
 		fi		
+
+		sleep $((30*60)) # check auto-clean every 30 minutes
 	done 
 }
 
@@ -138,34 +129,46 @@ get_one_file_to_upload() {
 		file=$(cat ./data/files.index | awk 'FNR <= 1')
 	else 
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
-		echo "Found last uploaded file:" $last_uploaded >> ./log/next_file
+		echo "Last uploaded file:" $last_uploaded >> ./log/next_file
 
 		if [ ! -f "${last_uploaded}" ]; then 
 			build_media_file_index ${last_uploaded}  # when last uploaded file has been deleted
 			file=$(cat ./data/files.index | awk 'FNR <= 1')
 		else 
-			echo "Searching the next file to upload..." >> ./log/next_file
-			file=$(get_next_file ${last_uploaded}) # last uploaded file still exists		
+			echo "Search next file to upload..." >> ./log/next_file
+			file=$(get_next_file ${last_uploaded}) # when last uploaded file still exists		
 		fi 
 	fi 
 	echo ${file}
 }
 
 # find many files will take several seconds
-# param: optional, $1=filename
-build_media_file_index() {
+# param: optional, $1=filename(buid index from files after the created time of this)
+# return: files list by modified time from past to current
+build_media_file_index() {	
 	if [ $# -eq 0 ]; then
-		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
-		| xargs ls -1rt > ./data/files.index  
+		echo "Build files uploading index..." >> log/logs
+		# files only sort by mtime in separate direcotries, cannot assure be sorted all by file mtime
+		# find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
+		# ls -1rtR /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
+		ls -1R /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
 	else
-		local last_uploaded_file_ts=$(get_file_created_timestamp $1)
+		# local last_uploaded_file_ts=$(get_file_created_timestamp $1)
 		# local current_time_ts=$(date +%s)
 		# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
-		local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
+		# local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
-		find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
-		-mmin -${eclipsed_mins} | xargs ls -1rt > ./data/files.index  
+		echo "Build a new uploading index for files created later than file ${1}..." >> log/logs
+		# Use -newer FILE is simple
+		# find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) \
+		# -mmin -${eclipsed_mins} | xargs ls -1rt > ./data/files.index  # not fully sorted by mtime (by directory first)
+
+		local file_parent=$(parse_file_parent ${last_uploaded})
+		find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
+		awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
+		> ./data/files.index
 	fi 
+	echo "Build the files uploading index successfully." >> ./log/logs
 	using_fileindex=true
 }
 
@@ -214,35 +217,52 @@ get_record_folders() {
 }
 
 # param: $1=last_uploaded_file_full_path
-# return: last_uploaded_file_full_path
+# return: the new file found to upload by compare with the last uploaded file
+# or return empty result
 get_next_file() {
 	local next_file
 
 	# search file from index first to save time (simple way)
-	if ${using_fileindex}; then 
+	# when using_fileindex is not defined, ${using_fileindex} will always be true
+	if ${using_fileindex} && [ -f ./data/files.index ] ; then 
+		echo "Search from built files.index." >> ./log/next_file
 		next_file=$(cat ./data/files.index | grep -A1 ${last_uploaded} | grep -v ${last_uploaded})
+		if [ -z "${next_file}" ] || [ ! -f ${next_file} ]; then
+			next_file=""
+			using_fileindex=false
+			echo "Can not find an existing file for next upload from index." >> ./log/next_file
+		fi 
+	else 
+		using_fileindex=false
 	fi 
 
-	# get next file from current or next newer folder (by hourly-named folder)
-	if [ "${using_fileindex}" = false ] || [ -z "${next_file}" ]; then 
-		using_fileindex=false 
+	# get next file from current or next newer folder (by hourly-named folder) 
+	if [ "${using_fileindex}" = false ]; then 
 		local file_name=$(parse_file_name ${last_uploaded})
 		local file_parent=$(parse_file_parent ${last_uploaded})
 
-		# check if there is a newer file in the same folder
+		# check if there is a newer file in the same folder (using `ls -1` can save awk '{print $9}')
+		# this will return a filename without the path included
+		echo "Search next file from the same directory: ${file_parent}" >> ./log/next_file
 		next_file=$(ls -l /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | awk '{print $9}' | grep -v ${file_name})
-
-		# check newer file from another newer folder
+		
 		if [ -z "${next_file}" ]; then
+			# check newer file from another newer folder
 			local next_folder=$(get_next_folder ${file_parent})
+			echo "Can not find a file to upload, search another folder: ${next_folder}" >> ./log/next_file
 			if [ ! -z "${next_folder}" ]; then 
-				next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	
+				next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
 			fi		
 		else
 			next_file="/tmp/sd/record/${file_parent}/${next_file}"
 		fi 
 	fi 
-	echo "Found the next file to upload: ${next_file}" >> ./log/next_file
+
+	if [ -f "${next_file}" ]; then
+		echo "Next file found: ${next_file}" >> ./log/next_file
+	else 
+		echo "No available file found to upload." >> ./log/next_file
+	fi
 	echo ${next_file}
 }
 

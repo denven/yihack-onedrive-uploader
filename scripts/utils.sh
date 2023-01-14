@@ -10,7 +10,7 @@ enable_auto_start() {
 	[ -f "${auto_start_file}" ] || touch ${auto_start_file} 
 
 	if [ -z "$(grep 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh' ${auto_start_file})" ]; then 
-		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh >> ./log/terminal &' >> ${auto_start_file}
+		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh >> ./log/terminal 2>&1 &' >> ${auto_start_file}
 	fi 
 }
 
@@ -92,8 +92,9 @@ get_file_size() {
 	fi 
 }
 
-get_percentage() {
-	echo $1 $2 | awk '{printf "%.2f%%", $1/$2*100}'
+# returns a number without %
+get_percent() {
+	echo $1 $2 | awk '{printf "%.2f%", 100*($1/$2)}'
 }
 
 # param: $1=the number of bytes
@@ -105,7 +106,7 @@ get_human_readble_size() {
 # params: $1=free_ratio, $2=threshold_to_clean
 # return 0 or 1(need to start auto-clean)
 evaluate_auto_clean() {
-	echo $1 $2 | awk '{if (($1 <= 100-$2) && ($2 >= 50)) {print 1} else {print 0}}'
+	echo $1 $2 | awk '{if ($1 > $2) {print 1} else {print 0}}'
 	# echo $1 $2 | awk '{if (($1 <= 100-$2)) {print 1} else {print 0}}'
 }
 
