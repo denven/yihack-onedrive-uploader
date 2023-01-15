@@ -85,6 +85,7 @@ upload_large_file() {
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
 
+	color_print "GREEN" "upload_large_file $1, $(get_human_readble_size ${file_size})"
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
 		# local content_range="bytes 0-$((${file_size}-1))"
@@ -101,14 +102,15 @@ upload_large_file() {
 		-H "Content-Range: bytes 0-$((${2}-1))/${2}" \
 		> /dev/null
 
-		# there are 2 errors warning here when use PUT instead of POST:
+		# there are 2 errors warning here when use PUT instead of POST (-T):
 		# 1. a session url error after the last chunk is transimitted
 		# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
 		# 2. curl: option --data-binary: out of memory
 		# can not be fixed and redircted to null curl
 		# but file transmission still work
 
-		curl -s -k -L -X DELETE ${upload_url}  # delete session after upload
+		# session will be automatically cleaned up by onedrive after it is expired
+		# curl -s -k -L -X DELETE ${upload_url}  # delete session when abortion
 	fi
 }
 
@@ -125,6 +127,7 @@ upload_large_file_by_chunks() {
 	send_api_request "create_upload_session" $1
 	color_print "GREEN" "upload_large_file_by_chunks $1, $(get_human_readble_size ${file_size})"
 
+	local retry_count=0; local retry_max=5
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
 
@@ -132,10 +135,11 @@ upload_large_file_by_chunks() {
 		# Since the max size of a mp4 file is less than 11MB, setting chunk size as 5.625M
 		# will let a large file be transfered in only 2 chunks	
 		# 320KB*18 = 327680*18 = 5898240 = 5.625M
-		local chunk_index=0; chunk_size=$((327680*18))
+		local chunk_index=0; chunk_size=$((327680*10))  # moderate cpu spike
 		local range_start=0; range_end=0; range_length=0
 
-		while [ $((${chunk_index}*${chunk_size})) -lt $2 ]; do
+		local status_code=200 # used to check chunk send error and retry(re-transmission)
+		while [ $((${chunk_index}*${chunk_size})) -lt $2 ] && [ ${retry_count} -lt ${retry_max} ]; do
 			range_start=$((${chunk_index}*${chunk_size}))
 			range_end=$((${range_start}+${chunk_size}-1))
 
@@ -144,22 +148,41 @@ upload_large_file_by_chunks() {
 			fi
 			range_length=$((${range_end}-${range_start}+1))
 
-			# do not use dd to copy file data as curl's input 
-			# dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null |
+			# do not use dd to copy file data as curl's input, output it to a tmp file instead
+			# dd if="$1" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null | \
 			# -H "Transfer-Encoding: chunked" \
-			# -o /dev/null \
-			curl -s -k -L -X PUT ${upload_url} \
-			--data-binary "${filename}"@"$1" \
-			-H "Content-Type: application/octet-stream"	\
-			-H "Content-Length: ${range_length}" \
-			-H "Content-Range: bytes ${range_start}-${range_end}/${2}" \
-			&> /dev/null
-			# > /dev/null 2>&1
+			echo "upload chunk: ${chunk_index}, length: ${range_length}, bytes: ${range_start}-${range_end} "
 
-			chunk_index=$((${chunk_index}+1))
+			# by writing to tmp file, the chance of success increases
+			dd if="$1" of="./data/chunk_data" count=1 skip=${chunk_index} bs=${chunk_size} 2> /dev/null 
+			status_code=$(
+				curl -s -k -L -X PUT ${upload_url} \
+				--data-binary @"./data/chunk_data" \
+				--write-out %{http_code} \
+				-H "Content-Type: application/octet-stream" \
+				-H "Content-Length: ${range_length}" \
+				-H "Content-Range: bytes ${range_start}-${range_end}/${2}" \
+				-o /dev/null
+				> /dev/null 2>&1
+			)
+
+			if [ ${status_code} -ge 200 ] && [ ${status_code} -lt 205 ]; then
+				chunk_index=$((${chunk_index}+1))
+				retry_count=0
+			else 
+				retry_count=$((${retry_count}+1))
+			fi
+			
+			sleep 1
 		done 
 
 		curl -s -k -L -X DELETE ${upload_url}  # delete session after upload
-		color_print "GREEN" "Success: upload_large_file_by_chunks $1"
+
+		if [ ${retry_count} -lt ${retry_max} ]; then
+			color_print "GREEN" "Success: upload_large_file_by_chunks $1"
+		else 
+			color_print "BROWN" "Failed: upload_large_file_by_chunks $1"
+			write_log "Upload file $1 failed with ${retry_count} retry."
+		fi
 	fi
 }  

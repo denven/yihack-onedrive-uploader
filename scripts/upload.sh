@@ -13,6 +13,9 @@ manage_video_uploads() {
 		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
 	fi 
 
+	using_fileindex=false	
+	no_available_files=true
+
 	# do the auto clean in a subshell when this feature is enabled
 	if [ "${auto_clean_threshold}" -ge 50 ] && [ "${auto_clean_threshold}" -lt 100 ]; then 
 		( manage_drive_auto_clean ) &  
@@ -28,14 +31,15 @@ manage_video_uploads() {
 		if [ "${idle_transfer_mode}" != true ] || [ ${camera_idled} = true ]; then
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
-				echo "Start to upload ${file}"
+				echo "Start to upload ${file}"							
 				upload_one_file ${file}
 				process_log_file 
 				sleep 2 # send file every 2s					
 			else 
 				echo "All files were uploaded, wait for a new recorded video or picture file."
+				no_available_files=true
 				sleep 60 # check after one minute
-			fi 			
+			fi 
 		fi
 	done
 }
@@ -126,7 +130,7 @@ check_camera_idle_status() {
 get_one_file_to_upload() {
 	local file
 	if [ ! -f ./data/last_upload.json ]; then 
-		build_media_file_index	# build file index when there is no upload history record
+		build_media_file_index	# build a full files uploading index when there is no uploaded file recorded
 		file=$(cat ./data/files.index | awk 'FNR <= 1')
 	else 
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
@@ -167,6 +171,7 @@ build_media_file_index() {
 			local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
 			local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
+			# find a newer files to build index (if no files found, the files.index will be empty)
 			if [ ${upload_video_only} != true ]; then 
 				find /tmp/sd/record/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
@@ -177,6 +182,7 @@ build_media_file_index() {
 				> ./data/files.index
 			fi 
 		else 
+			# find a newer directory to build index (if no directory found, the files.index will be empty)
 			if [ ${upload_video_only} != true ]; then 
 				find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
@@ -187,8 +193,12 @@ build_media_file_index() {
 				> ./data/files.index
 			fi
 		fi
-
-		rm data/last_upload.json  # need to create new last_upload.json file
+	fi 
+	
+	grep -q . ./data/files.index # check if it is empty
+	# when files.index contains file lines (not empty)
+	if [ $? -eq 0 ] && [ -f data/last_upload.json ]; then 
+		rm data/last_upload.json  # will create the new last_upload.json file when a new file is uploaded
 	fi 
 
 	write_log "Build the files uploading index successfully."
@@ -247,13 +257,13 @@ get_next_file() {
 
 	# search file from index first to save time (simple way)
 	# when using_fileindex is not defined, ${using_fileindex} will always be true
-	if ${using_fileindex} && [ -f ./data/files.index ] ; then 
-		echo "Search from built files.index." >> ./log/next_file
+	if [ ${using_fileindex} = true ] && [ -f ./data/files.index ] ; then 
+		echo "Search from built files index." >> ./log/next_file
 		next_file=$(cat ./data/files.index | grep -A1 ${last_uploaded} | grep -v ${last_uploaded})
 		if [ -z "${next_file}" ] || [ ! -f ${next_file} ]; then
 			next_file=""
 			using_fileindex=false
-			echo "Can not find an existing file for next upload from index." >> ./log/next_file
+			echo "Can not find an existing file for next upload from the built files index." >> ./log/next_file
 		fi 
 	else 
 		using_fileindex=false
@@ -266,7 +276,7 @@ get_next_file() {
 
 		# check if there is a newer file in the same folder (using `ls -1` can save awk '{print $9}')
 		# this will return a filename without the path included
-		echo "Search next file from the same directory: ${file_parent}" >> ./log/next_file
+		echo "Search next file from the directory '${file_parent}' where last uploaded file locates" >> ./log/next_file
 		if [ ${upload_video_only} != true ]; then 
 			next_file=$(ls -1 /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
 			if [ ! -z "${next_file}" ]; then 
@@ -276,24 +286,32 @@ get_next_file() {
 			next_file=$(ls -1 /tmp/sd/record/${file_parent}/*.mp4 | grep -A1 ${file_name} | grep -v ${file_name}) # full path
 		fi
 		
-		# check newer file from another newer folder
-		if [ -z "${next_file}" ]; then			
+		# check the newer file from another newer folder
+		if [ -z "${next_file}" ]; then		
+			echo "No newer file found from the directory where last uploaded file locates" >> ./log/next_file
 			local next_folder=$(get_next_folder ${file_parent})
-			echo "Can not find a file to upload, search another folder: ${next_folder}" >> ./log/next_file
-			if [ ! -z "${next_folder}" ]; then 
+			if [ -d "${next_folder}" ]; then 
+				echo "Search for another directory: ${next_folder}" >> ./log/next_file
 				if [ ${upload_video_only} != true ]; then 
 					next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
 				else 
 					next_file=$(find ${next_folder} -type f -iname \*.mp4| awk 'FNR <= 1')	# first file in the folder with full path
 				fi
-			fi		
+			else 
+				echo "No more newer direcotries found" >> ./log/next_file
+			fi 
 		fi 
 	fi 
 
 	if [ -f "${next_file}" ]; then
-		echo "Next file found: ${next_file}" >> ./log/next_file
+		if [ ${no_available_files} = true ]; then
+			no_available_files=false 
+			echo "New file found, wait for it is completed..." >> ./log/next_file
+			sleep 2  # wait for a complete new copy of file in case of uploading a broken file
+		fi 
+		echo -e "Next file found: ${next_file}\n" >> ./log/next_file
 	else 
-		echo "No available file found to upload." >> ./log/next_file
+		echo -e "No available file found to upload for now\n" >> ./log/next_file
 	fi
 	echo ${next_file}
 }
@@ -310,11 +328,12 @@ upload_one_file() {
 	if [ ${file_size} -lt $((4*1024*1024)) ]; then
 		upload_small_file $1
 	else
+		# upload_large_file $1 ${file_size}
 		upload_large_file_by_chunks $1 ${file_size}
 	fi
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
-		update_file_upload_data $1 
+		update_file_upload_data $1 # failed or successful upload of one file
 	fi
 }
 
