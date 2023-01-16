@@ -3,9 +3,8 @@
 ### To visitors and cloners:
 - A star 🌟 is the best encouragement to me if this repository helps you
 - Any issue 🐛 is welcome if you find a bug or have a question to ask
-- Test feedback on our camera is invaluable to all
-
-
+- Test feedback on your camera is invaluable to all users at anytime
+- Please note that OneDrive resumable API for uploading file larger than 4MB is not reliable for my case, see [issue](https://github.com/denven/yihack-onedrive-uploader/issues/6). However, YMMV.
 
 This repository is inspired by [roleoroleo](https://github.com/roleoroleo)'s [yi-hack-MStar.gdrive uploader](https://github.com/roleoroleo/yi-hack-MStar.gdrive). The gdrive uploader does provide some convenience, however, my Google drive has only 15GB space shared with Gmail and other account applications, and it is very easy to get storage fully packed with uploaded media files. Fortunately, I've subscribed Microsoft 365 Developer Program which provides 5TB storage space. I think uploading files to OneDrive is a better option for me.
 
