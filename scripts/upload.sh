@@ -34,7 +34,7 @@ manage_video_uploads() {
 				echo "Start to upload ${file}"							
 				upload_one_file ${file}
 				process_log_file 
-				sleep 2 # send file every 2s					
+				# sleep 2 # send file every 2s					
 			else 
 				echo "All files were uploaded, wait for a new recorded video or picture file."
 				no_available_files=true
@@ -53,8 +53,8 @@ manage_drive_auto_clean() {
 	write_log "Start the auto-clean monitor..."
 	while [ 1 ]; do 
 		get_drive_status
-		used=$(echo ${resp} | jq '.quota.used')
-		total=$(echo ${resp} | jq '.quota.total')
+		used=$(echo ${resp} | jq -r '.quota.used')
+		total=$(echo ${resp} | jq -r '.quota.total')
 
 		used_ratio=$(get_percent ${used} ${total})
 		local need_auto_clean=$(evaluate_auto_clean ${used_ratio} ${auto_clean_threshold})
@@ -88,7 +88,7 @@ remove_earliest_folder() {
 			delete_drive_item ${item_key}
 			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 				write_log "Deleted folder ${item_key}"
-				echo `date`": ${folder_to_delete}" >> ./log/deletion.history
+				echo `date +"%F %H:%M:%S"`": ${folder_to_delete}" >> ./log/deletion.history
 			fi 
 		else
 			echo "You have only one folder remain in your root upload folder, auto-clean is ignored."	
@@ -328,8 +328,9 @@ upload_one_file() {
 	if [ ${file_size} -lt $((4*1024*1024)) ]; then
 		upload_small_file $1
 	else
-		# upload_large_file $1 ${file_size}
+		# upload_large_file $1 ${file_size}		
 		upload_large_file_by_chunks $1 ${file_size}
+		# upload_large_file_by_fragments $1 ${file_size}
 	fi
 
 	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
@@ -345,5 +346,5 @@ update_file_upload_data() {
 	--arg utcts "$(date +%s)" \
 	'.file_path |= $file | .upload_time |= $date | .timestamp |= $utcts' \
 	> ./data/last_upload.json
-	echo `date`: $1 >> ./log/upload.history
+	echo `date +"%F %H:%M:%S"`: $1 >> ./log/upload.history
 }

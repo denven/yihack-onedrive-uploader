@@ -44,9 +44,9 @@ init_globals() {
 test_onedrive_status() {		
 	get_drive_status
 
-	local used=$(echo ${resp} | jq '.quota.used')
-	local remaining=$(echo ${resp} | jq '.quota.remaining')
-	local total=$(echo ${resp} | jq '.quota.total')
+	local used=$(echo ${resp} | jq -r '.quota.used')
+	local remaining=$(echo ${resp} | -r jq '.quota.remaining')
+	local total=$(echo ${resp} | jq -r '.quota.total')
 
 	local used_ratio=$(get_percent ${used} ${total})
 	local free_ratio=$(get_percent ${remaining} ${total})

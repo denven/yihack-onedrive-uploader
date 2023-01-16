@@ -111,7 +111,7 @@ evaluate_auto_clean() {
 }
 
 write_log() {
-	echo `date`": $*" >> ./log/logs
+	echo `date +"%F %H:%M:%S"`": $*" >> ./log/logs
 	# echo `date`": $*" | tee -a logs # to be tested
 }
 
