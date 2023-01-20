@@ -22,6 +22,7 @@ get_oauth2_auth_code() {
 	done 
 }
 
+# read application credentials from config.json
 oauth2_read_configs() {
 	grant_type=$(jq --raw-output '.grant_type' config.json)
 	client_id=$(jq --raw-output '.client_id' config.json)
@@ -54,7 +55,7 @@ redeem_oauth2_tokens() {
 
 	access_token=$(jq --raw-output '.access_token' ./data/token.json)
 	refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
-	api_error_msg=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
+	api_error_msg=$(echo ${resp} | jq --raw-output '.error.message')
 	if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
 		# backup for check new configuration
 		cp ./config.json ./data/config.bak
@@ -65,9 +66,11 @@ redeem_oauth2_tokens() {
 	fi
 }
 
-# refresh tokens in case of expiry by default
-# param: not required, if $1="test", it is testing the exipiration of refresh_token
+# periodically refresh tokens in subshell process in case of expiry by default
+# the execution time interval is 30 minutes (the lifetime of access token is 60-75 minutes)
+# param: not required, if $1="--test" or "-onetime", it refresh access token once only
 refresh_oauth2_tokens() {
+	local error=''; local resp=''
 	while [ 1 ] ; do
 		if [ "$#" -lt 1 ]; then
 			sleep $((30*60)) # renew tokens every 30 minutes
@@ -83,7 +86,7 @@ refresh_oauth2_tokens() {
 
 		access_token=$(echo ${resp} | jq --raw-output '.access_token')
 		refresh_token=$(echo ${resp} | jq --raw-output '.refresh_token')
-		error=$(echo ${resp} | jq --raw-output '.error.message' ./data/token.json)
+		error=$(echo ${resp} | jq --raw-output '.error.message')
 		if [ ! -z $access_token ]; then
 			echo ${resp} | jq '.' > ./data/token.json			
 			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."				
@@ -132,3 +135,14 @@ manage_oauth2_tokens() {
 		( refresh_oauth2_tokens ) &  # update tokens in subshell
 	fi	
 } 
+
+
+# read application credentials from config.json
+oauth2_read_tokens() {
+	if [ -f ./data/token.json ]; then
+		access_token=$(jq --raw-output '.access_token' ./data/token.json)
+		refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
+	else 
+		refresh_oauth2_tokens "--onetime"
+	fi
+}

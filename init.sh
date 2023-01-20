@@ -13,7 +13,10 @@ init_globals() {
 	upload_video_only=true # upload mp4 files only
 	auto_clean_threshold=100  # disable the auto-clean feature
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
+
 	SD_RECORD_ROOT="/tmp/sd/record"
+	YI_HACK_ROOT="/tmp/sd/yi-hack"
+	UPLOADER_ROOT="${YI_HACK_ROOT}/onedrive"
 
 	mkdir -p data log # prepare folders to store upload info and logs
 
@@ -45,7 +48,7 @@ test_onedrive_status() {
 	get_drive_status
 
 	local used=$(echo ${resp} | jq -r '.quota.used')
-	local remaining=$(echo ${resp} | -r jq '.quota.remaining')
+	local remaining=$(echo ${resp} | jq -r '.quota.remaining')
 	local total=$(echo ${resp} | jq -r '.quota.total')
 
 	local used_ratio=$(get_percent ${used} ${total})
@@ -55,8 +58,8 @@ test_onedrive_status() {
 	local used_gb=$(echo ${used} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 	local remain_gb=$(echo ${remaining} | awk '{printf "%.2f", $1/(1024*1024*1024)}')
 
-	color_print "GREEN" "You have used ${used_gb}GB(${used_ratio}%) of your storage space, with ${remain_gb}GB(${free_ratio}%) space remaining."
-	color_print "GREEN" "Check './drive_status.json' to see your drive quota details."
+	color_print "B_GREEN" "You have used ${used_gb}GB(${used_ratio}%) of your storage space, with ${remain_gb}GB(${free_ratio}%) space remaining."
+	color_print "GREEN" "Check './data/drive_status.json' to see your drive quota details."
 
 	if [ ! -z "${error}" ] && [ "${error}" != "null" ]; then
 		color_print "RED" "You don't have the access to the drive, please check your config.json file."
@@ -100,7 +103,7 @@ create_video_root_folder() {
 		fi
 	else
 		color_print "GREEN" "You've specified the folder '${video_root_folder}' to store your files."		
-		color_print "B_GREEN" "Configuration check is done: OK"
+		color_print "B_GREEN" "Configuration check is done: OK!"
 	fi 
 }
 

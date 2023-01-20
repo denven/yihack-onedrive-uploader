@@ -5,12 +5,14 @@ clear_screen() {
 }
 
 enable_auto_start() {
-	local auto_start_file="/tmp/sd/yi-hack/startup.sh"
-
+	local auto_start_file="${YI_HACK_ROOT}/startup.sh"
 	[ -f "${auto_start_file}" ] || touch ${auto_start_file} 
-
-	if [ -z "$(grep 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh' ${auto_start_file})" ]; then 
-		echo 'cd /tmp/sd/yi-hack/onedrive/ && ./init.sh >> ./log/terminal 2>&1 &' >> ${auto_start_file}
+	
+	local has_init_line=$(grep "cd ${UPLOADER_ROOT} && ./init.sh" ${auto_start_file})
+	
+	if [ -z "${has_init_line}" ]; then 
+		echo "cd ${UPLOADER_ROOT} && ./init.sh >> ${UPLOADER_ROOT}/log/terminal 2>&1 &" >> ${auto_start_file}
+		color_print "GREEN" "Enabled OneDrive Uploader auto-run when camera boots up."
 	fi 
 }
 

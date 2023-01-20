@@ -4,23 +4,23 @@
 # save last upload file information for reboot check
 
 manage_video_uploads() {
-	local idle_transfer_mode=$(jq --raw-output '.enable_idle_transfer' config.json)
-	local camera_idled=false
-	
-	color_print "GREEN" "\nStart to check camera video and image files for uploading..."
-	if [ "${idle_transfer_mode}" = true ]; then
-		color_print "BROWN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
-		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
-	fi 
-
-	using_fileindex=false	
-	no_available_files=true
-
 	# do the auto clean in a subshell when this feature is enabled
 	if [ "${auto_clean_threshold}" -ge 50 ] && [ "${auto_clean_threshold}" -lt 100 ]; then 
 		( manage_drive_auto_clean ) &  
+		sleep 2
 	fi 
 
+	local idle_transfer_mode=$(jq --raw-output '.enable_idle_transfer' config.json)
+	local camera_idled=false
+
+	color_print "GREEN" "Start to check camera video and image files for uploading..."
+	if [ "${idle_transfer_mode}" = true ]; then
+		color_print "BROWN" "You've enabled the idle transfer mode, files upload are likely to be delayed."
+		color_print "GREEN" "Disable it by changing 'enable_idle_transfer' key value to 'false' in your config.json."
+	fi 	
+
+	using_fileindex=false	
+	no_available_files=true
 	# the main loop of files upload 
 	while [ 1 ]; do		
 		if [ "${idle_transfer_mode}" = true ]; then
@@ -36,7 +36,7 @@ manage_video_uploads() {
 				process_log_file 
 				# sleep 2 # send file every 2s					
 			else 
-				echo "All files were uploaded, wait for a new recorded video or picture file."
+				echo "All files were uploaded, wait for a new recorded video or image file."
 				no_available_files=true
 				sleep 60 # check after one minute
 			fi 
@@ -44,35 +44,48 @@ manage_video_uploads() {
 	done
 }
 
-
-# periodically check and do drive auto-clean
+# periodically check and do drive auto-clean in subshell process
+# the execution time interval is ten minutes
 manage_drive_auto_clean() {
 	local used; local total; local used_ratio
-	local need_auto_clean; local auto_clean_done=false 
+	local need_auto_clean; local clean_started=false
+	local only_one_folder_remaining=false
 
 	write_log "Start the auto-clean monitor..."
+	color_print "GREEN" "\nStart the auto-clean monitor..."
 	while [ 1 ]; do 
-		get_drive_status
+		check_drive_space
 		used=$(echo ${resp} | jq -r '.quota.used')
+		remaining=$(echo ${resp} | jq -r '.quota.remaining')
 		total=$(echo ${resp} | jq -r '.quota.total')
 
-		used_ratio=$(get_percent ${used} ${total})
-		local need_auto_clean=$(evaluate_auto_clean ${used_ratio} ${auto_clean_threshold})
-		if [ ${need_auto_clean} -eq 1 ] && [ ${auto_clean_done} = false ]; then
-			color_print "BROWN" "Your storage usage (${used_ratio}%) has exceeded your specified threshold ${auto_clean_threshold}%, auto-clean started..."
-			remove_earliest_folder # set $auto_clean_done to true when done
-		elif [ ${auto_clean_done} = true ]; then
-			color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio} free space."
-			break # auto clean is completed
+		if [ ! -z ${total} ]; then 
+			used_ratio=$(get_percent ${used} ${total})
+			free_ratio=$(get_percent ${remaining} ${total})
 		else 
-			break # do nothing (do not start or haven't started auto-clean)
-		fi		
+			continue
+		fi 
 
-		sleep $((10*60)) # check auto-clean every 10 minutes
+		local need_auto_clean=$(evaluate_auto_clean ${used_ratio} ${auto_clean_threshold})
+
+		if [ ${need_auto_clean} -eq 1 ] && [ ${only_one_folder_remaining} = false ]; then
+			clean_started=true
+			color_print "BROWN" "Your storage usage ${used_ratio}% has exceeded your specified threshold ${auto_clean_threshold}%, start auto-clean..."
+			remove_earliest_folder # set $auto_clean_done to true when done
+		else 
+			if [ ${need_auto_clean} -eq 0 ] && [ ${clean_started} = true ]; then
+				clean_started=false # clean is completed
+				color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio}% free storage space."
+			elif [ ${only_one_folder_remaining} = true ]; then
+				only_one_folder_remaining=false
+				color_print "BROWN" "You have only one folder remain in your root upload folder, auto-clean is ignored."
+			fi 
+			sleep $((10*60)) # check auto-clean every 10 minutes after clean task is done		
+		fi		
 	done 
 }
 
-# Remove one folder to release space.
+# Remove ONE folder to release space.
 # Note that: This is a simple but non-aggressive auto clean solution to release space. 
 # 1. each time the uploader will remove the OLDEST uploaded folders ONLY;
 # 2. the uploader will keep at least one folder to ensure the latest uploaded files are not deleted;
@@ -88,11 +101,11 @@ remove_earliest_folder() {
 			delete_drive_item ${item_key}
 			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 				write_log "Deleted folder ${item_key}"
-				echo `date +"%F %H:%M:%S"`": ${folder_to_delete}" >> ./log/deletion.history
+				echo `date +"%F %H:%M:%S"`": /${video_root_folder}/${folder_to_delete}" >> ./log/deletion.history
 			fi 
-		else
-			echo "You have only one folder remain in your root upload folder, auto-clean is ignored."	
-			auto_clean_done=true		
+		else	
+			only_one_folder_remaining=true	
+			break	
 		fi 
 	done 
 }
@@ -109,16 +122,16 @@ get_earliest_folder() {
 
 check_camera_idle_status() {
 	local idled=false
-	if [ -f "/tmp/sd/record/tmp.mp4.tmp" ]; then
-		local size_1=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
+	if [ -f "${SD_RECORD_ROOT}/tmp.mp4.tmp" ]; then
+		local size_1=$(get_file_size "${SD_RECORD_ROOT}/tmp.mp4.tmp")
 		sleep 10
-		local size_2=$(get_file_size "/tmp/sd/record/tmp.mp4.tmp")
+		local size_2=$(get_file_size "${SD_RECORD_ROOT}/tmp.mp4.tmp")
 		if [ ${size_1} -eq ${size_2} ]; then
 			idled=true
 		fi
 	else
 		sleep 10
-		if [ -f "/tmp/sd/record/tmp.mp4.tmp" ]; then 
+		if [ -f "${SD_RECORD_ROOT}/tmp.mp4.tmp" ]; then 
 			idled=true
 		fi 
 	fi
@@ -154,12 +167,12 @@ build_media_file_index() {
 	if [ $# -eq 0 ]; then
 		write_log "Build files uploading index..."
 		# files only sort by mtime in separate direcotries, cannot assure be sorted all by file mtime
-		# find /tmp/sd/record -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
-		# ls -1rtR /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
+		# find ${SD_RECORD_ROOT} -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
+		# ls -1rtR ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
 		if [ ${upload_video_only} != true ]; then  
-			ls -1R /tmp/sd/record/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
+			ls -1R ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
 		else 
-			ls -1R /tmp/sd/record/*/*.mp4 > ./data/files.index 
+			ls -1R ${SD_RECORD_ROOT}/*/*.mp4 > ./data/files.index 
 		fi 
 	else
 		write_log "Build a new uploading index for files created later than file ${1}..."
@@ -173,22 +186,22 @@ build_media_file_index() {
 
 			# find a newer files to build index (if no files found, the files.index will be empty)
 			if [ ${upload_video_only} != true ]; then 
-				find /tmp/sd/record/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
+				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
 				> ./data/files.index 
 			else 
-				find /tmp/sd/record/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
+				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
 				> ./data/files.index
 			fi 
 		else 
 			# find a newer directory to build index (if no directory found, the files.index will be empty)
 			if [ ${upload_video_only} != true ]; then 
-				find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
+				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
 				> ./data/files.index
 			else 
-				find /tmp/sd/record/ -mindepth 1 -type d -newer /tmp/sd/record/${file_parent} | xargs ls -1R | \
+				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
 				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
 				> ./data/files.index
 			fi
@@ -206,7 +219,7 @@ build_media_file_index() {
 }
 
 # note that the data command is from busybox
-# param: $1=file_full_path, like /tmp/sd/record/2022Y11M12D15H/07M20S40.mp4
+# param: $1=file_full_path, like ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
 get_file_created_timestamp(){
 	local uniq_name=$(parse_file_uniq_name $1)
   	YYYYMMDD=$(echo ${uniq_name} | cut -c 1-4)-$(echo ${uniq_name} | cut -c 6-7)-$(echo ${uniq_name} | cut -c 9-10)
@@ -219,34 +232,34 @@ get_file_created_timestamp(){
 # param: $1=file_full_path
 # return: 2022Y11M12D15H
 parse_file_parent() {
-	# e.g: /tmp/sd/record/2022Y11M12D15H/07M20S40.mp4
+	# e.g: ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
 	echo $1 | grep -oE "[0-9]{4}Y[0-9]{2}M[0-9]{2}D[0-9]{2}H"
 }
 
 # param: $1=file_full_path
 # return: 07M20S40.mp4 
 parse_file_name() {
-	# e.g: /tmp/sd/record/2022Y11M12D15H/07M20S40.mp4
+	# e.g: ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
 	echo $1 | grep -oE "[0-9]{2}M[0-9]{2}S[0-9]{2}.*"
 }
 
 # param: $1=file_full_path
 # return: 2022Y11M12D15H07M20S40
 parse_file_uniq_name() {
-	# e.g: /tmp/sd/record/2022Y11M12D15H/07M20S40.mp4
+	# e.g: ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
 	echo $1 | sed 's/\/tmp\/sd\/record\///' | sed 's/\///' | sed 's/\..*$//'
 }
 
 # param: $1=folder_name
 get_folder_files() {
-	ls /tmp/sd/record/$1/ # not giving full path
-	# ls /tmp/sd/record/$1/ | awk '{OFS="\n"; $1=$1}1'
-	# find /tmp/sd/record/$1/ -type d -maxdepth 1 # providing full file path
+	ls ${SD_RECORD_ROOT}/$1/ # not giving full path
+	# ls ${SD_RECORD_ROOT}/$1/ | awk '{OFS="\n"; $1=$1}1'
+	# find ${SD_RECORD_ROOT}/$1/ -type d -maxdepth 1 # providing full file path
 }
 
 get_record_folders() {
-	ls -d /tmp/sd/record/*/
-	#  find /tmp/sd/record/ -type d -maxdepth 1
+	ls -d ${SD_RECORD_ROOT}/*/
+	#  find ${SD_RECORD_ROOT}/ -type d -maxdepth 1
 }
 
 # param: $1=last_uploaded_file_full_path
@@ -278,12 +291,12 @@ get_next_file() {
 		# this will return a filename without the path included
 		echo "Search next file from the directory '${file_parent}' where last uploaded file locates" >> ./log/next_file
 		if [ ${upload_video_only} != true ]; then 
-			next_file=$(ls -1 /tmp/sd/record/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
+			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
 			if [ ! -z "${next_file}" ]; then 
-				next_file="/tmp/sd/record/${file_parent}/${next_file}"
+				next_file="${SD_RECORD_ROOT}/${file_parent}/${next_file}"
 			fi 
 		else
-			next_file=$(ls -1 /tmp/sd/record/${file_parent}/*.mp4 | grep -A1 ${file_name} | grep -v ${file_name}) # full path
+			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent}/*.mp4 | grep -A1 ${file_name} | grep -v ${file_name}) # full path
 		fi
 		
 		# check the newer file from another newer folder
@@ -319,7 +332,7 @@ get_next_file() {
 # param: $1=current_folder_name, like 2022Y11M12D15H
 # return: hourly-named folder name, like 2022Y11M12D16H
 get_next_folder() {
-	ls -d /tmp/sd/record/202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
+	ls -d ${SD_RECORD_ROOT}/202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
 }
 
 # param: $1=sd_video_file_path
@@ -329,7 +342,8 @@ upload_one_file() {
 		upload_small_file $1
 	else
 		# upload_large_file $1 ${file_size}		
-		upload_large_file_by_chunks $1 ${file_size}
+		# upload_large_file_by_chunks $1 ${file_size}
+		upload_large_file_by_chunks_r $1 ${file_size}
 		# upload_large_file_by_fragments $1 ${file_size}
 	fi
 

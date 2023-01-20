@@ -11,9 +11,9 @@ This repository is inspired by [roleoroleo](https://github.com/roleoroleo)'s [yi
 If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Developer Program, you will get more storage space, which can allow you to store your camera videos and pictures to it other than paying an expensive manufacturer's storage premium plan.
 
 ## Features
-- much easier to set up
+- much easier to set up on your camera
   - use a JSON file to configure
-  - only few steps on your camera terminal
+  - only few instructions you need to run on your terminal
 - unattended upload your video (.mp4) and image (.jpg) files once set up successfully
 - both personal and tenant Microsoft accounts are supported
 - safe auto-clean of your earliest files when storage reaches the specified threshold
@@ -83,15 +83,15 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 
 
-1. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
+3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
    - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
    - upload your own `config.json`file, `init.sh`, `stop.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
 
-2. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
-3. run the entry Shell script `init.sh` to complete the application authorization grant flow
+4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
+5. run the entry Shell script `init.sh` to complete the application authorization grant flow
 
 ```bash
-cd /tmp/sd/yihack/onedrive/
+cd /tmp/sd/yi-hack/onedrive/
 ./init.sh
 ```
 ![Ahthorize uploader](./screenshots/application_authorization.png)
@@ -118,8 +118,10 @@ rm -rf data
 rm -rm log
 ```
   - If you want to setup with another OneDrive account (or Azure application data), you can delete or edit your current `config.json`, or replace it with a new one as well.
-
-
+- Once you have deleted `data` directory or changed application credentials in `config.json` files, you must run `init.sh` script manually to setup or reload your uploader again.
+```bash
+./init.sh
+```
 
 ## Todo list
 - [x] Auto-clean the oldest uploaded folders before the drive space is exhausted
