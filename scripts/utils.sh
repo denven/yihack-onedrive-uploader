@@ -121,8 +121,12 @@ write_log() {
 process_log_file() {
 	for log_file in ./log/*; do
 		if [ $(ls -l ${log_file} | awk '{print $5}') -gt 1048576 ] && [ -z $(echo "${log_file}" | grep "old") ]; then
-			mv ${log_file} ${log_file}.old 
-			touch ${log_file} 
+			if [ -f ${log_file}.old ]; then 
+				dd if=${log_file} of=${log_file}.old > /dev/null 
+			else 
+				cp ${log_file} ${log_file}.old 
+			fi 
+			echo > ${log_file} 
 		fi 
 	done 
 }
