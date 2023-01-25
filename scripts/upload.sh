@@ -27,13 +27,14 @@ manage_video_uploads() {
 			camera_idled=$(check_camera_idle_status)
 		fi
 
+		refresh_token_by_minutes 30 # when the token has been refreshed, update it in this process
 		# upload file, check and do auto-clean
 		if [ "${idle_transfer_mode}" != true ] || [ ${camera_idled} = true ]; then
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
 				echo "Start to upload ${file}"							
 				upload_one_file ${file}
-				process_log_file 
+				process_log_file
 				# sleep 2 # send file every 2s					
 			else 
 				echo "All files were uploaded, wait for a new recorded video or image file."
@@ -100,7 +101,7 @@ remove_earliest_folder() {
 		elif [ ${#item_key} -gt 14 ]; then  			
 			delete_drive_item ${item_key}
 			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
-				write_log "Deleted folder ${item_key}"
+				# write_log "Deleted folder ${item_key}"
 				echo `date +"%F %H:%M:%S"`": /${video_root_folder}/${folder_to_delete}" >> ./log/deletion.history
 			fi 
 		else	
@@ -181,7 +182,7 @@ build_media_file_index() {
 		if [ ! -d ${file_parent} ]; then 
 			local last_uploaded_file_ts=$(get_file_created_timestamp $1)
 			local current_time_ts=$(date +%s)
-			local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
+			# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
 			local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
 			# find a newer files to build index (if no files found, the files.index will be empty)

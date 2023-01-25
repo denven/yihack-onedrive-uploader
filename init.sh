@@ -12,6 +12,8 @@ init_globals() {
 	query=''; resp=''; error=''; video_root_folder=''
 	upload_video_only=true # upload mp4 files only
 	auto_clean_threshold=100  # disable the auto-clean feature
+
+	app_token_timer=$(date +%s) # global timer used for token check
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
 
 	SD_RECORD_ROOT="/tmp/sd/record"

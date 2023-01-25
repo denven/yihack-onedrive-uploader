@@ -1,10 +1,10 @@
 # OneDrive-uploader for Yi IP Cameras
 
 ### To visitors and cloners:
-- A star 🌟 is the best encouragement to me if this repository helps you
 - Any issue 🐛 is welcome if you find a bug or have a question to ask
 - Test feedback on your camera is invaluable to all users at anytime
-- Please note that OneDrive resumable API for uploading file larger than 4MB is not reliable for my case, see [issue](https://github.com/denven/yihack-onedrive-uploader/issues/6). However, YMMV.
+- Please note that OneDrive resumable API for uploading file larger than 4MB is not very reliable for my case, see [issue](https://github.com/denven/yihack-onedrive-uploader/issues/6). However, YMMV.
+- A star 🌟 from you is the best encouragement to me if you think this repository helps you.
 
 This repository is inspired by [roleoroleo](https://github.com/roleoroleo)'s [yi-hack-MStar.gdrive uploader](https://github.com/roleoroleo/yi-hack-MStar.gdrive). The gdrive uploader does provide some convenience, however, my Google drive has only 15GB space shared with Gmail and other account applications, and it is very easy to get storage fully packed with uploaded media files. Fortunately, I've subscribed Microsoft 365 Developer Program which provides 5TB storage space. I think uploading files to OneDrive is a better option for me.
 
@@ -17,6 +17,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 - unattended upload your video (.mp4) and image (.jpg) files once set up successfully
 - both personal and tenant Microsoft accounts are supported
 - safe auto-clean of your earliest files when storage reaches the specified threshold
+- Re-transmission control is used to assure files upload reliability
 
 ## Supported camera models
 > Yi cameras hacked with the same file hiearacy or builtin applications are more likely to be supported. Anyway, your own separate tests are necessary before you use it. I've tested on my own camera.
@@ -111,17 +112,16 @@ cd /tmp/sd/yi-hack/onedrive
 ./stop.sh
 ```
 - You might have messed up the configuration or you are not content with the running situation, you want to start again from the beginning.
-  - first, stop the uploader first by following above
-  - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to resume your uploading without any repetitive uploads).
+  - first, stop the uploader first by following above;
+  - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to resume your uploading without any repetitive uploads);
+  - run `./init.sh` again to get your access tokens again.
 ```bash
 rm -rf data
-rm -rm log
+rm -rf log
+./init.sh  
 ```
   - If you want to setup with another OneDrive account (or Azure application data), you can delete or edit your current `config.json`, or replace it with a new one as well.
 - Once you have deleted `data` directory or changed application credentials in `config.json` files, you must run `init.sh` script manually to setup or reload your uploader again.
 ```bash
 ./init.sh
 ```
-
-## Todo list
-- [x] Auto-clean the oldest uploaded folders before the drive space is exhausted

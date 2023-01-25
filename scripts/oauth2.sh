@@ -66,9 +66,9 @@ redeem_oauth2_tokens() {
 	fi
 }
 
-# periodically refresh tokens in subshell process in case of expiry by default
+# periodically refresh tokens in subshell process in case of expiry by default (this way is abandoned)
 # the execution time interval is 30 minutes (the lifetime of access token is 60-75 minutes)
-# param: not required, if $1="--test" or "-onetime", it refresh access token once only
+# param: not required, if $1="--test" or "--onetime", it refresh access token once only
 refresh_oauth2_tokens() {
 	local error=''; local resp=''
 	while [ 1 ] ; do
@@ -89,7 +89,8 @@ refresh_oauth2_tokens() {
 		error=$(echo ${resp} | jq --raw-output '.error.message')
 		if [ ! -z $access_token ]; then
 			echo ${resp} | jq '.' > ./data/token.json			
-			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."				
+			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."	
+			write_log "Refresh API tokens successfully, your token is still valid."			
 		elif [ ! -z ${error} ]; then
 			write_log ${error}
 			break
@@ -131,8 +132,8 @@ manage_oauth2_tokens() {
 	if [ ${need_re_assign} = true ]; then
 		get_oauth2_auth_code  
 		redeem_oauth2_tokens
-	else		
-		( refresh_oauth2_tokens ) &  # update tokens in subshell
+	#else		
+	#	( refresh_oauth2_tokens ) &  # update tokens in subshell
 	fi	
 } 
 
@@ -144,5 +145,14 @@ oauth2_read_tokens() {
 		refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
 	else 
 		refresh_oauth2_tokens "--onetime"
+	fi
+}
+
+# param: $1=minutes
+refresh_token_by_minutes() {		
+	local eclipsed_mins=$(get_elipsed_minutes ${app_token_timer})
+	if [ ${eclipsed_mins} -ge $1 ]; then 
+		refresh_oauth2_tokens "--onetime"
+		app_token_timer=$(date +%s)
 	fi
 }
