@@ -205,15 +205,17 @@ upload_large_file_by_chunks() {
 			# sleep 1
 		done 
 
-		curl -s -k -L -X DELETE "${upload_url}"  # delete session after upload
-
 		if [ ${status_code} -eq 200 ] || [ ${status_code} -eq 201 ]; then
 			color_print "GREEN" "Success: upload_large_file_by_chunks $1"
 		else 
 			if [ ${upload_retry} = false ]; then
 				upload_retry=true
 				color_print "BROWN" "Failed: upload_large_file_by_chunks $1, status_code: ${status_code}, try another time."
-			else 
+			else 			
+				# To cancel an upload session send a DELETE request to the upload URL.
+				# This should be used in scenarios where the upload is aborted, for example, if the user cancels the transfer.
+				# Temporary files and their accompanying upload session are automatically cleaned up after the expirationDateTime has passed.		
+				curl -s -k -L -X DELETE "${upload_url}"  # delete session after upload	
 				color_print "BROWN" "Failed: upload_large_file_by_chunks $1, status_code: ${status_code}, retry failed."
 				echo `date +"%F %H:%M:%S"`: $1 >> ./log/upload_failed.history			
 			fi 

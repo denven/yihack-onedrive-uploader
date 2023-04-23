@@ -103,6 +103,7 @@ cd /tmp/sd/yi-hack/onedrive/
 
 
 6. optional: reboot your camera
+`reboot -f # reboot without -f option cannot work on my camera`
 
 ## Maintenance 
 
@@ -119,6 +120,7 @@ cd /tmp/sd/yi-hack/onedrive
 rm -rf data
 rm -rf log
 ./init.sh  
+reboot -f
 ```
   - If you want to setup with another OneDrive account (or Azure application data), you can delete or edit your current `config.json`, or replace it with a new one as well.
 - Once you have deleted `data` directory or changed application credentials in `config.json` files, you must run `init.sh` script manually to setup or reload your uploader again.
