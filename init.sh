@@ -12,6 +12,7 @@ init_globals() {
 	query=''; resp=''; error=''; video_root_folder=''
 	upload_video_only=true # upload mp4 files only
 	auto_clean_threshold=100  # disable the auto-clean feature
+	convert_utc_path_name=false # for v0.4.9
 
 	app_token_timer=$(date +%s) # global timer used for token check
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
@@ -26,7 +27,7 @@ init_globals() {
 	color_print "GREEN" "Checking your OneDrive-uploader configuration..."
 	if [ ! -f ./config.json ]; then
 		echo '{ "grant_type": "authorization_code", "client_id": "", "client_secret": "", "tenant_id": "" }' \
-		| jq -M '. + {"video_root_folder": "yihack_videos", "auto_clean_threshold": "100", "enable_idle_transfer": "false"}' \
+		| jq -M '. + {"video_root_folder": "yihack_videos", "convert_utc_path_name": "false", "auto_clean_threshold": "100", "enable_idle_transfer": "false"}' \
 		> config.json
 		color_print "BROWN" "A template config.json file is generated for you, please fill in it and try again."
 		exit 0
@@ -43,6 +44,14 @@ init_globals() {
 		if [ ${auto_clean_threshold} -ge 50 ] && [ ${auto_clean_threshold} -lt 100 ]; then
 			color_print "BROWN" "You've enabled auto-clean feature when you use more than ${auto_clean_threshold}% of storage capacity."
 		fi 
+
+		local use_local_time=$(jq --raw-output '.convert_utc_path_name' config.json)
+		if [ ! -z "${use_local_time}" ] && [ "${use_local_time}" != "null" ]; then
+			convert_utc_path_name=${use_local_time}
+		fi
+		if [ "${convert_utc_path_name}" = true ]; then
+			color_print "BROWN" "The video file direcotries on camera will be converted to local time since you've enabled the path name conversion."
+		fi
 	fi
 }
 

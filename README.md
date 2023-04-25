@@ -65,6 +65,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
   "tenant_id": "e2a801f7-46fe-4dcf-91b7-6d4409c7760e",
   "scope": "https://graph.microsoft.com/.default",
   "video_root_folder": "yihack_videos",
+  "convert_utc_path_name": "false",
   "auto_clean_threshold": "100",
   "enable_idle_transfer": "false"
 }
@@ -80,6 +81,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    scope | https://graph.microsoft.com/.default | not required
 |    video_root_folder | yihack_videos |  name string without white spaces
 |    upload_video_only | true | not required; set it false will upload *.jpg files in the record folders
+|    convert_utc_path_name | false | not required; set it to true if you don't like the uploaded folders are in UTC time (for firmware v0.4.9 and later)
 |    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 

@@ -75,6 +75,8 @@ get_drive_items() {
 upload_small_file() {
 	local file_name=$(parse_file_name $1)
 	local file_parent=$(parse_file_parent $1)
+
+	file_parent=$(convert_pathname_from_utc_to_local $file_parent)
 	local target_path=${video_root_folder}/${file_parent}/${file_name}
 
 	query="curl -s -k -L -X PUT '${DRIVE_BASE_URI}/items/root:/${target_path}:/content'"	
@@ -84,6 +86,7 @@ upload_small_file() {
 
 # upload large files (4-60MB) with an upload session, no file splitting right now
 # issue: when a file is large, the camera memory is not enough and results in camera reboot
+# it is cuurently not used for this program
 # param: $1=sd_file_path, $2=file_size
 upload_large_file() {
 	local file_name=$(parse_file_name $1)
@@ -132,6 +135,7 @@ upload_large_file_by_chunks() {
 	local file_parent=$(parse_file_parent $1)
 	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
 	
+	file_parent=$(convert_pathname_from_utc_to_local $file_parent)
 	local upload_path=${video_root_folder}/${file_parent}/${file_name}
 	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
@@ -291,3 +295,26 @@ upload_large_file_by_fragments() {
 
 	color_print "GREEN" "Success: upload_large_file_by_fragments $1"	
 }  
+
+# auto calculate the seconds offset between local timezone and UTC-0
+get_timezone_seconds_delta() {
+	local_now=$(date +%Y%m%d\ %H:%M:%S)  # 20230424 23:40:20
+	utc_now=$(date -u +%Y%m%d\ %H:%M:%S) # 20230425 06:40:20
+	local_ts=$(date -d "${local_now:0:4}-${local_now:4:2}-${local_now:6:2} ${local_now:9:2}:${local_now:12:2}:${local_now:15:2}" +%s)
+	utc_ts=$(date -d "${utc_now:0:4}-${utc_now:4:2}-${utc_now:6:2} ${utc_now:9:2}:${utc_now:12:2}:${utc_now:15:2}" +%s)
+	echo $((local_ts-utc_ts))
+}
+
+# convert the folder name to the name labeled by local time instead of UTC, 
+# for example: 2023Y04M23D14H -> 2023Y04M23D07H
+convert_pathname_from_utc_to_local() {
+	if [ "${convert_utc_path_name}" = true ]; then 
+		hourly_path=$1
+		timestamp=$(date -d "${hourly_path:0:4}-${hourly_path:5:2}-${hourly_path:8:2} ${hourly_path:11:2}:00:00" +%s)
+		diff_seconds=$(get_timezone_seconds_delta)
+		timestamp=$((timestamp+diff_seconds))		
+		echo $(date -d "@$timestamp" +"%YY%mM%dD%HH")
+	else
+		echo $1
+	fi
+}
