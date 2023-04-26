@@ -66,6 +66,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
   "scope": "https://graph.microsoft.com/.default",
   "video_root_folder": "yihack_videos",
   "convert_utc_path_name": "false",
+  "TZ_string": "your_timezone_string",
   "auto_clean_threshold": "100",
   "enable_idle_transfer": "false"
 }
