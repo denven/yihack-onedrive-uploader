@@ -82,16 +82,16 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    video_root_folder | yihack_videos |  name string without white spaces
 |    upload_video_only | true | not required; set it false will upload *.jpg files in the record folders
 |    convert_utc_path_name | false | not required; set it to true if you don't like the uploaded folders are in UTC time (for firmware v0.4.9 and later)
+|    TZ_string | "" | set the timezone string instead of the location string, search and copy the "Timezone" box content as your timezone string from "http://Your_Camer_IP/?page=configurations".
 |    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 
-
-3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
+1. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
    - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
    - upload your own `config.json`file, `init.sh`, `stop.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
 
-4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
-5. run the entry Shell script `init.sh` to complete the application authorization grant flow
+2. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
+3. run the entry Shell script `init.sh` to complete the application authorization grant flow
 
 ```bash
 cd /tmp/sd/yi-hack/onedrive/

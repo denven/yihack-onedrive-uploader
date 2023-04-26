@@ -13,6 +13,7 @@ init_globals() {
 	upload_video_only=true # upload mp4 files only
 	auto_clean_threshold=100  # disable the auto-clean feature
 	convert_utc_path_name=false # for v0.4.9
+	timezone_offset_seconds=0 # it will be calated when convert_utc_path_name is true
 
 	app_token_timer=$(date +%s) # global timer used for token check
 	DRIVE_BASE_URI="https://graph.microsoft.com/v1.0/me/drive"
@@ -27,7 +28,7 @@ init_globals() {
 	color_print "GREEN" "Checking your OneDrive-uploader configuration..."
 	if [ ! -f ./config.json ]; then
 		echo '{ "grant_type": "authorization_code", "client_id": "", "client_secret": "", "tenant_id": "" }' \
-		| jq -M '. + {"video_root_folder": "yihack_videos", "convert_utc_path_name": "false", "auto_clean_threshold": "100", "enable_idle_transfer": "false"}' \
+		| jq -M '. + {"video_root_folder": "yihack_videos", "convert_utc_path_name": "false", "TZ_string": "", "auto_clean_threshold": "100", "enable_idle_transfer": "false"}' \
 		> config.json
 		color_print "BROWN" "A template config.json file is generated for you, please fill in it and try again."
 		exit 0
@@ -45,12 +46,15 @@ init_globals() {
 			color_print "BROWN" "You've enabled auto-clean feature when you use more than ${auto_clean_threshold}% of storage capacity."
 		fi 
 
-		local use_local_time=$(jq --raw-output '.convert_utc_path_name' config.json)
-		if [ ! -z "${use_local_time}" ] && [ "${use_local_time}" != "null" ]; then
-			convert_utc_path_name=${use_local_time}
-		fi
+		convert_utc_path_name=$(jq --raw-output '.convert_utc_path_name' config.json)
 		if [ "${convert_utc_path_name}" = true ]; then
-			color_print "BROWN" "The video file direcotries on camera will be converted to local time since you've enabled the path name conversion."
+			local TZ_string=$(jq --raw-output '.TZ_string' config.json)
+			if [ ! -z "${TZ_string}" ] && [ "${TZ_string}" != "null" ]; then
+				timezone_offset_seconds=$(get_timezone_offset_seconds ${TZ_string})
+			fi 
+			if [ ${timezone_offset_seconds} -ne 0 ]; then
+				color_print "BROWN" "The video file direcotries on camera will be converted to name by your local time, since you've enabled the path name conversion with timezone offset ${timezone_offset_seconds} seconds."
+			fi 
 		fi
 	fi
 }
@@ -122,7 +126,7 @@ create_video_root_folder() {
 init() {
 	clear_screen
 	run_singleton
-
+	
 	init_globals
 	manage_oauth2_tokens
 	set_cleanup_traps

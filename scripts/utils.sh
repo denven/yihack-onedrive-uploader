@@ -148,3 +148,38 @@ jq_update_json() {
 	# works
 	# jq '.address = "abcde"' config.json > tmpfile && mv -- tmpfile config.json && rm -f 
 }
+
+
+# auto calculate the seconds offset between local timezone and UTC-0, not used due to the issue
+# when the script is executed from boot, it always returns 0 since the new hack version v0.4.9
+# has reset the timezone to UTC rather than using the user-configured timezone before scripts run.
+get_timezone_seconds_delta() {
+	local local_now=$(date +%Y%m%d\ %H:%M:%S)  # e.g. 20230424 23:40:20
+	local utc_now=$(date -u +%Y%m%d\ %H:%M:%S) # e.g. 20230425 06:40:20
+	local local_ts=$(date -d "${local_now:0:4}-${local_now:4:2}-${local_now:6:2} ${local_now:9:2}:${local_now:12:2}:${local_now:15:2}" +%s)
+	local utc_ts=$(date -d "${utc_now:0:4}-${utc_now:4:2}-${utc_now:6:2} ${utc_now:9:2}:${utc_now:12:2}:${utc_now:15:2}" +%s)
+	echo $((local_ts-utc_ts))
+}
+
+
+# make sure use TZ string instead of timezone geographic string
+get_timezone_offset_seconds() {
+    local TZ_string=$1
+    local local_now=$(TZ=$TZ_string date +"%Y%m%d %H:%M:%S")	
+	local utc_now_ts=$(date -u +%s)	
+	local local_now_ts=$(date -d "${local_now:0:4}-${local_now:4:2}-${local_now:6:2} ${local_now:9:2}:${local_now:12:2}:${local_now:15:2}" +%s)
+	echo $((local_now_ts-utc_now_ts))
+}
+
+# convert the folder name to the name labeled by local time instead of UTC, 
+# for example: 2023Y04M23D14H -> 2023Y04M23D07H
+convert_pathname_from_utc_to_local() {
+	if [ "${convert_utc_path_name}" = true ]; then 
+		local hourly_path=$1
+		local timestamp=$(date -d "${hourly_path:0:4}-${hourly_path:5:2}-${hourly_path:8:2} ${hourly_path:11:2}:00:00" +%s)
+		local timestamp=$((timestamp+timezone_offset_seconds))		
+		echo $(date -d "@$timestamp" +"%YY%mM%dD%HH")
+	else
+		echo $1
+	fi
+}
