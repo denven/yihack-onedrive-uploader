@@ -70,6 +70,18 @@ get_drive_items() {
 
 # Note: no need to create its parent folder on onedirve before the upload.
 
+# param: camera video directory name (the folder name is converted to local time)
+# output: 2 levels folder path string
+# for example: 2023Y04M26D02H's parent path will be 202304/20230426
+# Since there will be too many folders on the root upload directory as each hour the camera may generate one folder
+# this function is called to generate a path to orgianize the video folders by yearmonth -> day -> hourly folder tree.
+# e.g: it will sort folders into 202304 -> 20230425 -> the hourly folders structure
+get_ymd_parent_path() {
+	local year_month=$(echo $1 | sed 's/Y\(..\).*$/\1/')  # 202304
+	local year_month_day=$(echo $1 | sed 's/[^0-9]*//g' | cut -c1-8) # 20230426
+	echo ${year_month}/${year_month_day}
+}
+
 # when file_size <= 4MB
 # param: $1=sd_file_path
 upload_small_file() {
@@ -77,55 +89,14 @@ upload_small_file() {
 	local file_parent=$(parse_file_parent $1)
 
 	file_parent=$(convert_pathname_from_utc_to_local $file_parent)
-	local target_path=${video_root_folder}/${file_parent}/${file_name}
+	local organized_path=$(get_ymd_parent_path $file_parent)
 
+	local target_path=${video_root_folder}/${organized_path}/${file_parent}/${file_name}
 	query="curl -s -k -L -X PUT '${DRIVE_BASE_URI}/items/root:/${target_path}:/content'"	
 	query="${query} --upload-file $1"
 	send_api_request "upload_small_file" $1
 }
 
-# upload large files (4-60MB) with an upload session, no file splitting right now
-# issue: when a file is large, the camera memory is not enough and results in camera reboot
-# it is cuurently not used for this program
-# param: $1=sd_file_path, $2=file_size
-upload_large_file() {
-	local file_name=$(parse_file_name $1)
-	local file_parent=$(parse_file_parent $1)
-	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
-	
-	local upload_path=${video_root_folder}/${file_parent}/${file_name}
-	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
-	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
-	send_api_request "create_upload_session" $1
-
-	color_print "GREEN" "upload_large_file $1, $(get_human_readble_size ${file_size})"
-	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
-		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
-		# local content_range="bytes 0-$((${file_size}-1))"
-		# query="curl -L -X PUT ${upload_url} --data \"${file_name}\"=@\"$2\""  #--upload-file $2 if for single file
-		# query="${query} -H 'Content-Length: ${file_size}'"
-		# query="${query} -H 'Content-Range: ${content_range}/${file_size}'"
-		# send_api_request "upload_large_file" $1 $2  
-
-		# the query string cannot be expanded by eval or $() because upload_url contains single quote
-		# we use curl command directly here, hide the output json
-		curl -s -k -L -X PUT ${upload_url} \
-		--data-binary "${filename}"@"$1" \
-		-H "Content-Length: ${2}" \
-		-H "Content-Range: bytes 0-$((${2}-1))/${2}" \
-		> /dev/null
-
-		# there are 2 errors warning here when use PUT instead of POST (-T):
-		# 1. a session url error after the last chunk is transimitted
-		# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
-		# 2. curl: option --data-binary: out of memory
-		# can not be fixed and redircted to null curl
-		# but file transmission still work
-
-		# session will be automatically cleaned up by onedrive after it is expired
-		# curl -s -k -L -X DELETE ${upload_url}  # delete session when abortion
-	fi
-}
 
 # https://learn.microsoft.com/en-us/onedrive/developer/rest-api/api/driveitem_createuploadsession?view=odsp-graph-online
 # https://learn.microsoft.com/en-us/onedrive/developer/rest-api/concepts/errors?view=odsp-graph-online
@@ -136,9 +107,10 @@ upload_large_file_by_chunks() {
 	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
 
 	file_parent=$(convert_pathname_from_utc_to_local $file_parent)
-	echo "Target OneDrive folder:" $file_parent, "file size: $(get_human_readble_size ${file_size})"
-	local upload_path=${video_root_folder}/${file_parent}/${file_name}
+	local organized_path=$(get_ymd_parent_path $file_parent)
+	echo "Target OneDrive path:" $organized_path/$file_parent, "file size: $(get_human_readble_size ${file_size})"
 
+	local upload_path=${video_root_folder}/${organized_path}/${file_parent}/${file_name}
 	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
 	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
 	send_api_request "create_upload_session" $1
@@ -255,6 +227,50 @@ upload_large_file_by_chunks_r() {
 	if [ ${upload_retry} = true ]; then 
 		upload_large_file_by_chunks $1 $2
 	fi 
+}
+
+
+# upload large files (4-60MB) with an upload session, no file splitting right now
+# issue: when a file is large, the camera memory is not enough and results in camera reboot
+# then this function is cuurently not used for this program
+# param: $1=sd_file_path, $2=file_size
+upload_large_file() {
+	local file_name=$(parse_file_name $1)
+	local file_parent=$(parse_file_parent $1)
+	local json_data="'{\"item\":{\"@name.conflictBehavior\":\"replace\",\"name\":\"${file_name}\"}}'"
+	
+	local upload_path=${video_root_folder}/${file_parent}/${file_name}
+	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
+	query="${query} -H 'Content-Type: application/json' --data-raw "${json_data}
+	send_api_request "create_upload_session" $1
+
+	color_print "GREEN" "upload_large_file $1, $(get_human_readble_size ${file_size})"
+	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
+		local upload_url=$(echo ${resp} | jq --raw-output '.uploadUrl')	
+		# local content_range="bytes 0-$((${file_size}-1))"
+		# query="curl -L -X PUT ${upload_url} --data \"${file_name}\"=@\"$2\""  #--upload-file $2 if for single file
+		# query="${query} -H 'Content-Length: ${file_size}'"
+		# query="${query} -H 'Content-Range: ${content_range}/${file_size}'"
+		# send_api_request "upload_large_file" $1 $2  
+
+		# the query string cannot be expanded by eval or $() because upload_url contains single quote
+		# we use curl command directly here, hide the output json
+		curl -s -k -L -X PUT ${upload_url} \
+		--data-binary "${filename}"@"$1" \
+		-H "Content-Length: ${2}" \
+		-H "Content-Range: bytes 0-$((${2}-1))/${2}" \
+		> /dev/null
+
+		# there are 2 errors warning here when use PUT instead of POST (-T):
+		# 1. a session url error after the last chunk is transimitted
+		# {"error":{"code":"itemNotFound","message":"The upload session was not found"}}
+		# 2. curl: option --data-binary: out of memory
+		# can not be fixed and redircted to null curl
+		# but file transmission still work
+
+		# session will be automatically cleaned up by onedrive after it is expired
+		# curl -s -k -L -X DELETE ${upload_url}  # delete session when abortion
+	fi
 }
 
 
