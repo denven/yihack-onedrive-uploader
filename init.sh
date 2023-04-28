@@ -48,12 +48,11 @@ init_globals() {
 
 		convert_utc_path_name=$(jq --raw-output '.convert_utc_path_name' config.json)
 		if [ "${convert_utc_path_name}" = true ]; then
-			local TZ_string=$(jq --raw-output '.TZ_string' config.json)
-			if [ ! -z "${TZ_string}" ] && [ "${TZ_string}" != "null" ]; then
-				timezone_offset_seconds=$(get_timezone_offset_seconds ${TZ_string})
-			fi 
-			if [ ${timezone_offset_seconds} -ne 0 ]; then
-				color_print "BROWN" "The video file direcotries on camera will be converted to name by your local time, since you've enabled the path name conversion with timezone offset ${timezone_offset_seconds} seconds."
+			color_print "BROWN" "Your camera currently uses $TZ as the timezone string."
+			timezone_offset_seconds=$(get_timezone_offset_seconds)
+			if [ ${timezone_offset_seconds} -ge 1800 ] || [ ${timezone_offset_seconds} -le -1800 ]; then
+				color_print "BROWN" "You've enabled the folder name conversion, and your timezone offset $((timezone_offset_seconds/3600)) hours."
+				color_print "BROWN" "The video file direcotries names will be converted and named by your local time when uploading."
 			fi 
 		fi
 	fi

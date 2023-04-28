@@ -1,9 +1,10 @@
 {
-  "grant_type": "authorization_code",
-  "client_id": "",
-  "client_secret": "",
-  "tenant_id": "",
-  "video_root_folder": "yihack_videos",
-  "auto_clean_threshold": "90",
-  "enable_idle_transfer": "false"
+	"grant_type": "authorization_code",
+	"client_id": "your-client-id",
+	"client_secret": "your-client-secret",
+	"tenant_id": "consumers",
+	"video_root_folder": "yihack_videos",
+	"auto_clean_threshold": "80",
+	"convert_utc_path_name": "true",
+	"enable_idle_transfer": "false"
 }

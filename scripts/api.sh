@@ -16,6 +16,9 @@ send_api_request() {
 			write_log "Token invalid or expired, start to renew the tokens..."
 			refresh_oauth2_tokens "--onetime" 	# renew directly instead read from token.json		
 			send_api_request "--retry" $@
+		elif [ "${api_error_message}" = "Insufficient Space Available" ]; then 
+			color_print "BROWN" "Failed: Insufficient Space Available, all following upload will fail continuously before the OneDrive space is released."
+			color_print "BROWN" "Info: Please set auto_clean_threshold between 50 to 99 to enable OneDrive auto-clean feature, or delete some files or folders manually."
 		fi 
 	else
 		error=''

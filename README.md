@@ -16,6 +16,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
   - only few instructions you need to run on your terminal
 - unattended upload your video (.mp4) and image (.jpg) files once set up successfully
 - both personal and tenant Microsoft accounts are supported
+- auto organize uploaded folders into multi-levels by months and dates
 - safe auto-clean of your earliest files when storage reaches the specified threshold
 - Re-transmission control is used to assure files upload reliability
 
@@ -66,7 +67,6 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
   "scope": "https://graph.microsoft.com/.default",
   "video_root_folder": "yihack_videos",
   "convert_utc_path_name": "false",
-  "TZ_string": "your_timezone_string",
   "auto_clean_threshold": "100",
   "enable_idle_transfer": "false"
 }
@@ -83,7 +83,6 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    video_root_folder | yihack_videos |  name string without white spaces
 |    upload_video_only | true | not required; set it false will upload *.jpg files in the record folders
 |    convert_utc_path_name | false | not required; set it to true if you don't like the uploaded folders are in UTC time (for firmware v0.4.9 and later)
-|    TZ_string | "" | set the timezone string instead of the location string, search and copy the "Timezone" box content as your timezone string from "http://Your_Camer_IP/?page=configurations".
 |    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 

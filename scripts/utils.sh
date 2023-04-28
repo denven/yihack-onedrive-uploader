@@ -164,9 +164,9 @@ get_timezone_seconds_delta() {
 
 # make sure use TZ string instead of timezone geographic string
 get_timezone_offset_seconds() {
-    local TZ_string=$1
-	local TZ_using=$TZ
-    local local_now=$(TZ=$TZ_string date +"%Y%m%d %H:%M:%S")	
+    local TZ_setting=$(cat /etc/TZ) # the original TZ setting value
+	local TZ_using=$TZ # the actually uses TZ value (is empty when testing, which means use GMT/UTC0)
+    local local_now=$(TZ=$TZ_setting date +"%Y%m%d %H:%M:%S")	
 	local utc_now_ts=$(date -u +%s)	
 	local local_now_ts=$(date -d "${local_now:0:4}-${local_now:4:2}-${local_now:6:2} ${local_now:9:2}:${local_now:12:2}:${local_now:15:2}" +%s)
 	TZ=$TZ_using # restore timezone setting

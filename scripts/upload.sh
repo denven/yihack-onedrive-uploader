@@ -72,14 +72,15 @@ manage_drive_auto_clean() {
 		if [ ${need_auto_clean} -eq 1 ] && [ ${only_one_folder_remaining} = false ]; then
 			clean_started=true
 			color_print "BROWN" "Your storage usage ${used_ratio}% has exceeded your specified threshold ${auto_clean_threshold}%, start auto-clean..."
-			remove_earliest_folder # set $auto_clean_done to true when done
+			# remove_earliest_folder # set $auto_clean_done to true when done (call this when all video folders are put inside root upload directory)
+			delete_earliest_folder # for video file folders are oganized into multiple levels 
 		else 
 			if [ ${need_auto_clean} -eq 0 ] && [ ${clean_started} = true ]; then
 				clean_started=false # clean is completed
 				color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio}% free storage space."
 			elif [ ${only_one_folder_remaining} = true ]; then
 				only_one_folder_remaining=false
-				color_print "BROWN" "You have only one folder remain in your root upload folder, auto-clean is ignored."
+				color_print "BROWN" "You have only one folder remain in your root upload directory, auto-clean is ignored."
 			fi 
 			sleep $((10*60)) # check auto-clean every 10 minutes after clean task is done		
 		fi		
@@ -96,10 +97,10 @@ remove_earliest_folder() {
 	local folder_to_delete=""
 	for item_key in $(get_earliest_folder ${video_root_folder_id}); do 
 		if [ ${#item_key} -eq 14 ]; then 
-			folder_to_delete=${item_key}
+			folder_to_delete=${item_key}  # print the folder name to delete
 			echo "Start to delete folder ${folder_to_delete}"			
 		elif [ ${#item_key} -gt 14 ]; then  			
-			delete_drive_item ${item_key}
+			delete_drive_item ${item_key} # delete by the folder id
 			if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
 				# write_log "Deleted folder ${item_key}"
 				echo `date +"%F %H:%M:%S"`": /${video_root_folder}/${folder_to_delete}" >> ./log/deletion.history
@@ -119,6 +120,80 @@ get_earliest_folder() {
 	else
 		echo "Ignored"
 	fi 
+}
+
+
+# delete folder and save deletion record with its path, the sub-folders and files will be deleted as well.
+# params: $1--folder_id, $2---folder_path
+delete_one_folder() {
+	delete_drive_item $1 # delete by the folder id
+	if [ -z "${error}" ] || [ "${error}" = "null" ]; then 
+		echo `date +"%F %H:%M:%S"`": $2" >> ./log/deletion.history
+	fi 
+}
+
+# delete the empty or earliest folder by checking the 3-level folders
+# 1st level: months (202304), 2nd level: days (20230426), 3rd level: hours (2023Y04M05D07H)
+delete_earliest_folder() {
+	local folder_level=1
+	local level_folder_cnt=0
+	local folder_id="" folder_path="" folder_name=""
+	local month_name="" day_name="" hour_name="" folder_path=""
+	local month_count=0
+
+	local cur_path_id=${video_root_folder_id}
+	while [ $folder_level -le 3 ]; do
+		get_drive_items ${cur_path_id} "-list" > /dev/null
+		level_folder_cnt=$(echo $resp | jq '.value | length')
+		
+		if [ $level_folder_cnt -gt 0 ]; then			
+			folder_id=$(echo $resp | jq --raw-output '.value | .[0].id')
+			folder_name=$(echo $resp | jq --raw-output '.value | .[0].name')
+		fi
+
+		# check monthly folders
+		if [ ${folder_level} -eq 1 ]; then
+			if [ $level_folder_cnt -gt 0 ]; then
+				month_name=${folder_name}
+				month_count=${level_folder_cnt}
+			else 
+				color_print "BROWN" "No folder found in your root upload directory."
+				break
+			fi
+
+		# check daily folders
+		elif [ ${folder_level} -eq 2 ]; then
+			if [ $level_folder_cnt -gt 0 ]; then			\
+				day_name=${folder_name}
+			else 
+				if [ ${month_count} -gt 1 ]; then
+					folder_path="/${video_root_folder}/${month_name}"
+					delete_one_folder ${folder_id} ${folder_path}	
+				else
+					only_one_folder_remaining=true	
+					break	
+				fi
+			fi
+
+		# check hourly folders
+		elif [ ${folder_level} -eq 3 ]; then
+			if [ $level_folder_cnt -gt 0 ]; then			
+				hour_name=${folder_name}
+				folder_path="/${video_root_folder}/${month_name}/${day_name}/${hour_name}"
+				delete_one_folder ${folder_id} ${folder_path}
+			else
+				folder_path="/${video_root_folder}/${month_name}/${day_name}"
+				delete_one_folder ${folder_id} ${folder_path}
+			fi
+		fi 
+
+		if [ ${level_folder_cnt} -gt 0 ]; then
+			cur_path_id=${folder_id}
+			folder_level=$((folder_level+1))	
+		else
+			break
+		fi 
+	done
 }
 
 check_camera_idle_status() {
