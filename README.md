@@ -102,22 +102,28 @@ cd /tmp/sd/yi-hack/onedrive/
 - Follow the URL redirections to consent, sign in, etc. and then you will get a authorization code, copy the code to your camera terminal and continue.
 - Now, you've set up yourOneDrive uploader. The script will begin to search media files not uploaded from camera sd card to upload, it may throw some information or error messages on your terminal. Error message like `curl: option --data-binary: out of memory` is tolerable and has no issue to the file upload.
 ![Successful configuration](./screenshots/successful_configuration.png)
-
+- Check your uploaded folder structure, you will find folders are organized by months and dates, which are more convenient to find and view.
+![Successful configuration](./screenshots/organize_uploaded_folders.png)
 
 6. optional: reboot your camera
-`reboot -f # reboot without -f option cannot work on my camera`
+```bash
+reboot -f # reboot without -f option cannot work on my camera
+```
 
 ## Maintenance 
 
 - In case you run into an issue or you just want to stop the uploader, run the `stop.sh` script to kill the running uploader.
+  
 ```bash
 cd /tmp/sd/yi-hack/onedrive
 ./stop.sh
 ```
+
 - You might have messed up the configuration or you are not content with the running situation, you want to start again from the beginning.
   - first, stop the uploader first by following above;
   - delete all generated data (or keep file `data/last_upload.json` if you want the uploader to resume your uploading without any repetitive uploads);
-  - run `./init.sh` again to get your access tokens again.
+  - run `./init.sh` again to get your access tokens again;
+  - reboot the camera to run it unattendedly with the new configuration.
 ```bash
 rm -rf data
 rm -rf log
@@ -125,7 +131,8 @@ rm -rf log
 reboot -f
 ```
   - If you want to setup with another OneDrive account (or Azure application data), you can delete or edit your current `config.json`, or replace it with a new one as well.
-- Once you have deleted `data` directory or changed application credentials in `config.json` files, you must run `init.sh` script manually to setup or reload your uploader again.
+- Once you have deleted `data` directory or changed application credentials in `config.json` files, you must run the `init.sh` script manually to setup or reload your uploader again.
 ```bash
 ./init.sh
+reboot -f
 ```
