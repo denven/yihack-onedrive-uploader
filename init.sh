@@ -48,7 +48,11 @@ init_globals() {
 
 		convert_utc_path_name=$(jq --raw-output '.convert_utc_path_name' config.json)
 		if [ "${convert_utc_path_name}" = true ]; then
-			color_print "BROWN" "Your camera currently uses $TZ as the timezone string."
+			if [ ! -z ${TZ} ]; then
+				color_print "BROWN" "Your camera currently uses $TZ as the timezone string."
+			else 
+				color_print "BROWN" "Your camera currently uses GMT0 as the timezone string."			
+			fi
 			timezone_offset_seconds=$(get_timezone_offset_seconds)
 			if [ ${timezone_offset_seconds} -ge 1800 ] || [ ${timezone_offset_seconds} -le -1800 ]; then
 				color_print "BROWN" "You've enabled the folder name conversion, and your timezone offset $((timezone_offset_seconds/3600)) hours."
