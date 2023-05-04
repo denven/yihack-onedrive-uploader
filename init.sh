@@ -22,6 +22,9 @@ init_globals() {
 	YI_HACK_ROOT="/tmp/sd/yi-hack"
 	UPLOADER_ROOT="${YI_HACK_ROOT}/onedrive"
 
+	# append curl and jq path to system env variable to avoid failures
+	export PATH=$PATH:/tmp/sd/yi-hack/bin:/tmp/sd/yi-hack/sbin
+
 	mkdir -p data log # prepare folders to store upload info and logs
 
 	write_log "OneDive Uploader started..."
