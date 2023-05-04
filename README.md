@@ -55,7 +55,7 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 5. Authentication setting for personal account type only
 ![Authentication](./screenshots/personal_authentication.png)   
 
-### Use the repository code to upload your media files
+### Use the repository code and setup on your camera
 1. clone the repository code to your local computer and enter the code directory
 2. use the data fetched from Azure application to fill in your `config.json` file before uploading the files to camera. Please refer to the following example to edit the `config.json` file in your directory:
 ```Json
@@ -86,12 +86,13 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
 
-1. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
-   - upload `curl` and `jq` binaries from local `bin` directory to `/tmp/sd/yi-hack/sbin`
-   - upload your own `config.json`file, `init.sh`, `stop.sh` and `scripts` directory to `/tmp/sd/yi-hack/onedrive`
+3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
+   - create an empty directory named `onedrive` in path `/tmp/sd/yi-hack`
+   - upload `init.sh`, `stop.sh` and `scripts` and `bin` directory to `/tmp/sd/yi-hack/onedrive`
+   - upload your own `config.json` file to `/tmp/sd/yi-hack/onedrive`
 
-2. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
-3. run the entry Shell script `init.sh` to complete the application authorization grant flow
+4. sign in your [Microsoft Azure](https://login.microsoftonline.com/) account first
+5. run the entry Shell script `init.sh` to complete the application authorization grant flow
 
 ```bash
 cd /tmp/sd/yi-hack/onedrive/

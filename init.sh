@@ -23,7 +23,8 @@ init_globals() {
 	UPLOADER_ROOT="${YI_HACK_ROOT}/onedrive"
 
 	# append curl and jq path to system env variable to avoid failures
-	export PATH=$PATH:/tmp/sd/yi-hack/bin:/tmp/sd/yi-hack/sbin
+	# and use separate curl and jq programs other than from yi-hack's path (to remove the boot sequence dependency)
+	export PATH=$PATH:/tmp/sd/yi-hack/onedrive/bin
 
 	mkdir -p data log # prepare folders to store upload info and logs
 
