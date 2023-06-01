@@ -111,7 +111,7 @@ upload_large_file_by_chunks() {
 
 	file_parent=$(convert_pathname_from_utc_to_local $file_parent)
 	local organized_path=$(get_ymd_parent_path $file_parent)
-	echo "Target OneDrive path:" $organized_path/$file_parent, "file size: $(get_human_readble_size ${file_size})"
+	echo "Target OneDrive path:" /$organized_path/$file_parent, "file size: $(get_human_readble_size ${file_size})"
 
 	local upload_path=${video_root_folder}/${organized_path}/${file_parent}/${file_name}
 	query="curl -s -k -L -X POST '${DRIVE_BASE_URI}/root:/${upload_path}:/createUploadSession'"
@@ -182,6 +182,7 @@ upload_large_file_by_chunks() {
 				else
 					echo "A re-transmission is required due to status_code: ${status_code}"
 				fi 				
+				sleep 2  # add a little time break before next try
 			fi			
 			# sleep 1
 		done 

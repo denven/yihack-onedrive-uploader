@@ -59,11 +59,13 @@ manage_drive_auto_clean() {
 		used=$(echo ${resp} | jq -r '.quota.used')
 		remaining=$(echo ${resp} | jq -r '.quota.remaining')
 		total=$(echo ${resp} | jq -r '.quota.total')
-
-		if [ ! -z ${total} ]; then 
+		
+		# avoid out of range error for large number comparision
+		if [ ! -z ${total} ] && [ $((total/(1024*1024*1024))) -gt 0 ]; then 
 			used_ratio=$(get_percent ${used} ${total})
 			free_ratio=$(get_percent ${remaining} ${total})
 		else 
+			sleep $((1*60))  # avoid unnecessary clean
 			continue
 		fi 
 
