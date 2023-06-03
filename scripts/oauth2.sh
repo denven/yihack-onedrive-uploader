@@ -55,14 +55,15 @@ redeem_oauth2_tokens() {
 
 	access_token=$(jq --raw-output '.access_token' ./data/token.json)
 	refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
-	api_error_msg=$(echo ${resp} | jq --raw-output '.error.message')
+	api_error_msg=$(echo ${resp} | jq --raw-output '.error')
 	if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
 		# backup for check new configuration
 		cp ./config.json ./data/config.bak
 		color_print "GREEN" "Get OneDrive access tokens successfully"
 		enable_auto_start
-	elif [ ! -z $api_error_msg ]; then
-		color_print "BROWN" ${api_error_msg}
+	else 
+		error_desc=$(echo ${resp} | jq --raw-output '.error_description')
+		color_print "BROWN" ${api_error_msg}, ${error_desc}
 	fi
 }
 
@@ -84,14 +85,19 @@ refresh_oauth2_tokens() {
 			--data-urlencode "client_secret=${client_secret}" \
 			--data-urlencode "refresh_token=${refresh_token}")
 
-		access_token=$(echo ${resp} | jq --raw-output '.access_token')
-		refresh_token=$(echo ${resp} | jq --raw-output '.refresh_token')
-		error=$(echo ${resp} | jq --raw-output '.error.message')
-		if [ ! -z $access_token ]; then
+		local access_token_tmp=$(echo ${resp} | jq --raw-output '.access_token')
+		local refresh_token_tmp=$(echo ${resp} | jq --raw-output '.refresh_token')		
+		if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
+			access_token=${access_token_tmp}  # save the new tokens (they may not change)
+			refresh_token=${refresh_token_tmp}							
 			echo ${resp} | jq '.' > ./data/token.json			
 			color_print "GREEN" "Refresh API tokens successfully, your token is still valid."	
-			write_log "Refresh API tokens successfully, your token is still valid."			
-		elif [ ! -z ${error} ]; then
+			write_log "Refresh API tokens successfully, your token is still valid."	
+		else
+			api_error_msg=$(echo ${resp} | jq --raw-output '.error')
+			error_desc=$(echo ${resp} | jq --raw-output '.error_description')
+			color_print "BROWN" ${api_error_msg}, ${error_desc}
+			color_print "BROWN" "Refresh API tokens failed, your may need to start over the configuration again if this error persists when the token is expired."
 			write_log ${error}
 			break
 		fi
@@ -117,15 +123,18 @@ manage_oauth2_tokens() {
 		elif [ -f ./data/token.json ]; then
 			access_token=$(jq --raw-output '.access_token' ./data/token.json)
 			refresh_token=$(jq --raw-output '.refresh_token' ./data/token.json)
-			if [ ! -z $access_token ] && [ ! -z $refresh_token ]; then 
+			if [ $access_token = "null" ] || [ $refresh_token = "null" ]; then
+				color_print "BROWN" "Cannot find tokens from ./data/token.json, file may be corrupted, re-authorization of OneDrive access is required..."
+				write_log "Token file is corrupted, re-authorization of OneDrive access is required"
+				need_re_assign=true 
+			elif [ ! -z $access_token ] && [ ! -z $refresh_token ]; then 
 				color_print "GREEN" "Found an existing refresh token, start to test its availability..."
 				refresh_oauth2_tokens "--test"
+				if [ -z $error ] || [ "$error" = "null" ]; then
+					need_re_assign=false
+					color_print "GREEN" "The existing refresh token is still valid"
+				fi 				
 			fi		
-			if [ -z $error ] || [ "$error" = "null" ]; then
-				need_re_assign=false
-			else 
-				color_print "GREEN" "The existing refresh token is still valid"
-			fi 
 		fi
 	fi
 
