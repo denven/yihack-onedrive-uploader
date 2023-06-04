@@ -221,7 +221,7 @@ check_camera_idle_status() {
 get_one_file_to_upload() {
 	local file
 	if [ ! -f ./data/last_upload.json ]; then 
-		build_media_file_index	# build a full files uploading index when there is no uploaded file recorded
+		build_media_file_index	# build a full files upload index when there is no uploaded file recorded
 		file=$(cat ./data/files.index | awk 'FNR <= 1')
 	else 
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
@@ -243,7 +243,8 @@ get_one_file_to_upload() {
 # return: files list by modified time from past to current
 build_media_file_index() {	
 	if [ $# -eq 0 ]; then
-		write_log "Build files uploading index..."
+		# when no uploaded file is recorded, it will create a full upload index
+		write_log "Build a full upload index from all recorded files in sd card..."
 		# files only sort by mtime in separate direcotries, cannot assure be sorted all by file mtime
 		# find ${SD_RECORD_ROOT} -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
 		# ls -1rtR ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
@@ -253,11 +254,12 @@ build_media_file_index() {
 			ls -1R ${SD_RECORD_ROOT}/*/*.mp4 > ./data/files.index 
 		fi 
 	else
-		write_log "Build a new uploading index for files created later than file ${1}..."
+		# this branch processes index build when the recorded last uploaded file cannot be found from the sd card
+		write_log "Update the upload index from files only created after file ${1}..."
 
-		local file_parent=$(parse_file_parent ${last_uploaded}) 
+		local file_parent=$(parse_file_parent ${1}) 
 		if [ ! -d ${file_parent} ]; then 
-			local last_uploaded_file_ts=$(get_file_created_timestamp $1)
+			local last_uploaded_file_ts=$(get_file_created_timestamp ${1})
 			local current_time_ts=$(date +%s)
 			# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
 			local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
@@ -284,12 +286,13 @@ build_media_file_index() {
 				> ./data/files.index
 			fi
 		fi
-	fi 
-	
-	grep -q . ./data/files.index # check if it is empty
-	# when files.index contains file lines (not empty)
-	if [ $? -eq 0 ] && [ -f data/last_upload.json ]; then 
-		rm data/last_upload.json  # will create the new last_upload.json file when a new file is uploaded
+
+		grep -q . ./data/files.index # check if the index file is empty
+		# when a new index is created with found files not uploaded,
+		# delete the existing last_upload.json file to create a new last_upload.json
+		if [ $? -eq 0 ] && [ -f data/last_upload.json ]; then 
+			rm data/last_upload.json  # will create the new last_upload.json file when a new file is uploaded
+		fi 
 	fi 
 
 	write_log "Build the files uploading index successfully."
@@ -340,6 +343,7 @@ get_record_folders() {
 	#  find ${SD_RECORD_ROOT}/ -type d -maxdepth 1
 }
 
+# feature: get the path of next file to upload from files index or sd record directory
 # param: $1=last_uploaded_file_full_path
 # return: the new file found to upload by compare with the last uploaded file
 # or return empty result

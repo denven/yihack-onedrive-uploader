@@ -132,7 +132,7 @@ manage_oauth2_tokens() {
 				refresh_oauth2_tokens "--test"
 				if [ -z $error ] || [ "$error" = "null" ]; then
 					need_re_assign=false
-					color_print "GREEN" "The existing refresh token is still valid"
+					color_print "GREEN" "The existing refresh token is still valid."
 				fi 				
 			fi		
 		fi
