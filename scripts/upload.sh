@@ -228,6 +228,7 @@ get_one_file_to_upload() {
 		echo "Last uploaded file:" $last_uploaded >> ./log/next_file
 
 		if [ ! -f "${last_uploaded}" ]; then 
+			echo "Last uploaded file doesn't exist any more, update index..." >> ./log/next_file
 			build_media_file_index ${last_uploaded}  # when last uploaded file has been deleted
 			file=$(cat ./data/files.index | awk 'FNR <= 1')
 		else 
@@ -249,54 +250,55 @@ build_media_file_index() {
 		# find ${SD_RECORD_ROOT} -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
 		# ls -1rtR ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
 		if [ ${upload_video_only} != true ]; then  
-			ls -1R ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' > ./data/files.index 
+			ls -1R ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' > ./data/files.index 
 		else 
 			ls -1R ${SD_RECORD_ROOT}/*/*.mp4 > ./data/files.index 
 		fi 
+		write_log "Built a new full index successfully."
 	else
-		# this branch processes index build when the recorded last uploaded file cannot be found from the sd card
-		write_log "Update the upload index from files only created after file ${1}..."
+		# when the recorded last uploaded file cannot be found from the sd card
+		write_log "Update index from files newer than file ${1}..."
 
-		local file_parent=$(parse_file_parent ${1}) 
-		if [ ! -d ${file_parent} ]; then 
+		local file_parent=$(parse_file_parent ${1})  
+		if [ ! -d ${SD_RECORD_ROOT}/${file_parent} ]; then 
+			# the parent folder is deleted as well
 			local last_uploaded_file_ts=$(get_file_created_timestamp ${1})
 			local current_time_ts=$(date +%s)
 			# local eclipsed_mins=$(((${current_time_ts}-${last_uploaded_file_ts})/60))		
 			local eclipsed_mins=$(get_elipsed_minutes ${last_uploaded_file_ts})
 
-			# find a newer files to build index (if no files found, the files.index will be empty)
+			# find newer files to build index (if no files found, the files.index will be empty)
+			# note that -mmin is not accurate for searching files created, its for modified match
+			# and it will create a full index instead
 			if [ ${upload_video_only} != true ]; then 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' \
 				> ./data/files.index 
 			else 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' \
 				> ./data/files.index
 			fi 
 		else 
-			# find a newer directory to build index (if no directory found, the files.index will be empty)
+			# find directories newer than the uploaded file's parent directory to build new index
+			# if no directory are found, the files.index will be empty
 			if [ ${upload_video_only} != true ]; then 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }' \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' \
 				> ./data/files.index
 			else 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s%s\n", dir, $1} }' \
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' \
 				> ./data/files.index
 			fi
 		fi
-
-		grep -q . ./data/files.index # check if the index file is empty
-		# when a new index is created with found files not uploaded,
-		# delete the existing last_upload.json file to create a new last_upload.json
-		if [ $? -eq 0 ] && [ -f data/last_upload.json ]; then 
-			rm data/last_upload.json  # will create the new last_upload.json file when a new file is uploaded
-		fi 
+		write_log "Updated index successfully."
 	fi 
 
-	write_log "Build the files uploading index successfully."
-	using_fileindex=true
+	grep -q . ./data/files.index # check if the index file is empty
+	if [ $? -eq 0 ]; then 
+		using_fileindex=true
+	fi	
 }
 
 # note that the data command is from busybox
@@ -401,7 +403,7 @@ get_next_file() {
 	if [ -f "${next_file}" ]; then
 		if [ ${no_available_files} = true ]; then
 			no_available_files=false 
-			echo "New file found, wait for it is completed..." >> ./log/next_file
+			echo "No new file found, wait for a new record file..." >> ./log/next_file
 			sleep 2  # wait for a complete new copy of file in case of uploading a broken file
 		fi 
 		echo -e "Next file found: ${next_file}\n" >> ./log/next_file
