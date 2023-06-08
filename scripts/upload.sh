@@ -227,13 +227,13 @@ get_one_file_to_upload() {
 		local last_uploaded=$(jq --raw-output '.file_path' ./data/last_upload.json) 
 		echo "Last uploaded file:" $last_uploaded >> ./log/next_file
 
-		if [ ! -f "${last_uploaded}" ]; then 
+		if [ "${last_upload}" = "NO_NEW_FILES" ] || [ -f "${last_uploaded}" ]; then
+			echo "Search next file to upload..." >> ./log/next_file
+			file=$(get_next_file ${last_uploaded}) # when last uploaded file still exists			
+		else
 			echo "Last uploaded file doesn't exist any more, update index..." >> ./log/next_file
 			build_media_file_index ${last_uploaded}  # when last uploaded file has been deleted
 			file=$(cat ./data/files.index | awk 'FNR <= 1')
-		else 
-			echo "Search next file to upload..." >> ./log/next_file
-			file=$(get_next_file ${last_uploaded}) # when last uploaded file still exists		
 		fi 
 	fi 
 	echo ${file}
@@ -373,7 +373,7 @@ get_next_file() {
 
 		# check if there is a newer file in the same folder (using `ls -1` can save awk '{print $9}')
 		# this will return a filename without the path included
-		echo "Search next file from the directory '${file_parent}' where last uploaded file locates" >> ./log/next_file
+		echo "Search in directory: '${file_parent}'" >> ./log/next_file
 		if [ ${upload_video_only} != true ]; then 
 			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
 			if [ ! -z "${next_file}" ]; then 
@@ -385,10 +385,10 @@ get_next_file() {
 		
 		# check the newer file from another newer folder
 		if [ -z "${next_file}" ]; then		
-			echo "No newer file found from the directory where last uploaded file locates" >> ./log/next_file
+			echo "No newer file found from directory last uploaded file located" >> ./log/next_file
 			local next_folder=$(get_next_folder ${file_parent})
 			if [ -d "${next_folder}" ]; then 
-				echo "Search for another directory: ${next_folder}" >> ./log/next_file
+				echo "Search in another newer directory: ${next_folder}" >> ./log/next_file
 				if [ ${upload_video_only} != true ]; then 
 					next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
 				else 
@@ -406,9 +406,10 @@ get_next_file() {
 			echo "No new file found, wait for a new record file..." >> ./log/next_file
 			sleep 2  # wait for a complete new copy of file in case of uploading a broken file
 		fi 
-		echo -e "Next file found: ${next_file}\n" >> ./log/next_file
+		echo -e "Next file to upload: ${next_file}\n" >> ./log/next_file
 	else 
-		echo -e "No available file found to upload for now\n" >> ./log/next_file
+		echo -e "No available newer file to upload for now\n" >> ./log/next_file
+		next_file="NO_NEW_FILES"
 	fi
 	echo ${next_file}
 }
