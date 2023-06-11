@@ -137,3 +137,5 @@ reboot -f
 ./init.sh
 reboot -f
 ```
+
+- :warning: be cautious to delete file `./data/last_upload.json` if you want to restart the uploader and resume the upload to avoid repeatitive upload of all recorded files.
