@@ -87,7 +87,7 @@ refresh_oauth2_tokens() {
 
 		local access_token_tmp=$(echo ${resp} | jq --raw-output '.access_token')
 		local refresh_token_tmp=$(echo ${resp} | jq --raw-output '.refresh_token')		
-		if [ ! -z $access_token ] && [ "${access_token}" != "null" ]; then
+		if [ ! -z ${access_token_tmp} ] && [ "${refresh_token_tmp}" != "null" ]; then
 			access_token=${access_token_tmp}  # save the new tokens (they may not change)
 			refresh_token=${refresh_token_tmp}							
 			echo ${resp} | jq '.' > ./data/token.json			
