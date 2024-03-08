@@ -22,7 +22,11 @@ send_api_request() {
 		fi 
 	else
 		error=''
-		color_print "GREEN" "Success: $*"
+		if [ "$1"="upload_small_file" ]; then
+			color_print "GREEN" "$(date +"%F %H:%M:%S") Success: $*"
+		else
+			color_print "GREEN" "Success: $*"
+		fi
 	fi
 }
 
@@ -188,7 +192,7 @@ upload_large_file_by_chunks() {
 		done 
 
 		if [ ${status_code} -eq 200 ] || [ ${status_code} -eq 201 ]; then
-			color_print "GREEN" "Success: upload_large_file_by_chunks $1"
+			color_print "GREEN" "$(date +"%F %H:%M:%S") Success: upload_large_file_by_chunks $1"
 		else 
 			if [ ${upload_retry} = false ]; then
 				upload_retry=true

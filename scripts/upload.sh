@@ -32,7 +32,7 @@ manage_video_uploads() {
 		if [ "${idle_transfer_mode}" != true ] || [ ${camera_idled} = true ]; then
 			local file=$(get_one_file_to_upload)
 			if [ ! -z "${file}" ] && [ -f ${file} ]; then 
-				echo "Start to upload ${file}"							
+				echo "$(date +"%F %H:%M:%S") Start to upload ${file}"							
 				upload_one_file ${file}
 				process_log_file
 				# sleep 2 # send file every 2s					
@@ -403,8 +403,6 @@ get_next_file() {
 	if [ -f "${next_file}" ]; then
 		if [ ${no_available_files} = true ]; then
 			no_available_files=false 
-			echo "No new file found, wait for a new record file..." >> ./log/next_file
-			sleep 2  # wait for a complete new copy of file in case of uploading a broken file
 		fi 
 		echo -e "Next file to upload: ${next_file}\n" >> ./log/next_file
 	else 
