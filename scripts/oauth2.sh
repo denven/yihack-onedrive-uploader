@@ -78,7 +78,7 @@ refresh_oauth2_tokens() {
 		fi	
 		error=''	
 		resp=$(
-			curl -s -k -L -X POST "https://login.microsoftonline.com/${tenant_id}/oauth2/v2.0/token " \
+			curl -s -k -L -X POST "https://login.microsoftonline.com/${tenant_id}/oauth2/v2.0/token" \
 			-H 'Content-Type: application/x-www-form-urlencoded' \
 			--data-urlencode 'grant_type=refresh_token' \
 			--data-urlencode "client_id=${client_id}" \
