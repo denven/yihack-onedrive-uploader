@@ -250,7 +250,7 @@ build_media_file_index() {
 		# find ${SD_RECORD_ROOT} -maxdepth 2 -type f \( -iname \*.jpg -o -iname \*.mp4 \) | xargs ls -1rt > ./data/files.index 
 		# ls -1rtR ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s%s\n", dir, $1} }'
 		if [ ${upload_video_only} != true ]; then  
-			ls -1R ${SD_RECORD_ROOT}/*/ | awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' > ./data/files.index 
+			ls -1R ${SD_RECORD_ROOT}/*/ | grep -v ".h26x" | awk '{ gsub("/\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' > ./data/files.index 
 		else 
 			ls -1R ${SD_RECORD_ROOT}/*/*.mp4 > ./data/files.index 
 		fi 
