@@ -272,24 +272,24 @@ build_media_file_index() {
 			# and it will create a full index instead
 			if [ ${upload_video_only} != true ]; then 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' \
-				> ./data/files.index 
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' | \
+				grep -v ".h26x" > ./data/files.index 
 			else 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -mmin -${eclipsed_mins} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' \
-				> ./data/files.index
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' | \
+				grep -v ".h26x" > ./data/files.index
 			fi 
 		else 
 			# find directories newer than the uploaded file's parent directory to build new index
 			# if no directory are found, the files.index will be empty
 			if [ ${upload_video_only} != true ]; then 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' \
-				> ./data/files.index
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if(length($1) > 0) { printf "%s/%s\n", dir, $1} }' | \
+				grep -v ".h26x" > ./data/files.index
 			else 
 				find ${SD_RECORD_ROOT}/ -mindepth 1 -type d -newer ${SD_RECORD_ROOT}/${file_parent} | xargs ls -1R | \
-				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' \
-				> ./data/files.index
+				awk '{ gsub("\:", ""); if ($1 ~ /sd/) { dir=$1 } else if($1 ~ /mp4/) { printf "%s/%s\n", dir, $1} }' | \
+				grep -v ".h26x" > ./data/files.index
 			fi
 		fi
 		write_log "Updated index successfully."
@@ -375,7 +375,7 @@ get_next_file() {
 		# this will return a filename without the path included
 		echo "Search in directory: '${file_parent}'" >> ./log/next_file
 		if [ ${upload_video_only} != true ]; then 
-			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -A1 ${file_name} | grep -v ${file_name}) # filename only
+			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -v ".h26x" | grep -A1 ${file_name} | grep -v ${file_name})  # filename only
 			if [ ! -z "${next_file}" ]; then 
 				next_file="${SD_RECORD_ROOT}/${file_parent}/${next_file}"
 			fi 
@@ -390,7 +390,7 @@ get_next_file() {
 			if [ -d "${next_folder}" ]; then 
 				echo "Search in another newer directory: ${next_folder}" >> ./log/next_file
 				if [ ${upload_video_only} != true ]; then 
-					next_file=$(find ${next_folder} -type f | awk 'FNR <= 1')	# first file in the folder with full path
+					next_file=$(find ${next_folder} -type f | grep -v ".h26x" | awk 'FNR <= 1')	# first file in the folder with full path
 				else 
 					next_file=$(find ${next_folder} -type f -iname \*.mp4| awk 'FNR <= 1')	# first file in the folder with full path
 				fi
