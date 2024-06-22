@@ -73,7 +73,7 @@ manage_drive_auto_clean() {
 
 		if [ ${need_auto_clean} -eq 1 ] && [ ${only_one_folder_remaining} = false ]; then
 			clean_started=true
-			# it seems in sub shell, get_percent will return value with a trailing % charater, no % 
+			# it seems in sub shell, get_percent will return value with a trailing % charater
 			color_print "BROWN" "Your storage usage ${used_ratio} has exceeded your specified threshold ${auto_clean_threshold}%, start auto-clean..."
 			# remove_earliest_folder # set $auto_clean_done to true when done (call this when all video folders are put inside root upload directory)
 			delete_earliest_folder # for video file folders are oganized into multiple levels 
