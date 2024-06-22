@@ -105,8 +105,8 @@ get_human_readble_size() {
 	echo $1 | awk '{ split( "Byte KB MB GB TB", units ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f%s", $1, units[s] }'
 }
 
-# params: $1=free_ratio, $2=threshold_to_clean
-# return 0 or 1(need to start auto-clean)
+# params: $1=used_ratio, $2=threshold_to_clean
+# return 0 or 1(need to start auto-clean when used ratio exceeds the configured threshold ratio)
 evaluate_auto_clean() {
 	echo $1 $2 | awk '{if ($1 > $2) {print 1} else {print 0}}'
 	# echo $1 $2 | awk '{if (($1 <= 100-$2)) {print 1} else {print 0}}'

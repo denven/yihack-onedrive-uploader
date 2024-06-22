@@ -73,13 +73,14 @@ manage_drive_auto_clean() {
 
 		if [ ${need_auto_clean} -eq 1 ] && [ ${only_one_folder_remaining} = false ]; then
 			clean_started=true
-			color_print "BROWN" "Your storage usage ${used_ratio}% has exceeded your specified threshold ${auto_clean_threshold}%, start auto-clean..."
+			# it seems in sub shell, get_percent will return value with a trailing % charater, no % 
+			color_print "BROWN" "Your storage usage ${used_ratio} has exceeded your specified threshold ${auto_clean_threshold}%, start auto-clean..."
 			# remove_earliest_folder # set $auto_clean_done to true when done (call this when all video folders are put inside root upload directory)
 			delete_earliest_folder # for video file folders are oganized into multiple levels 
 		else 
 			if [ ${need_auto_clean} -eq 0 ] && [ ${clean_started} = true ]; then
 				clean_started=false # clean is completed
-				color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio}% free storage space."
+				color_print "B_GREEN" "Bravo! Auto-clean is done, you currently have ${free_ratio} free storage space."
 			elif [ ${only_one_folder_remaining} = true ]; then
 				only_one_folder_remaining=false
 				color_print "BROWN" "You have only one folder remain in your root upload directory, auto-clean is ignored."
@@ -356,7 +357,7 @@ get_next_file() {
 	# when using_fileindex is not defined, ${using_fileindex} will always be true
 	if [ ${using_fileindex} = true ] && [ -f ./data/files.index ] ; then 
 		echo "Search from built files index." >> ./log/next_file
-		next_file=$(cat ./data/files.index | grep -A1 ${last_uploaded} | grep -v ${last_uploaded})
+		next_file=$(cat ./data/files.index | sed -n "/${last_uploaded}/{n;p}")
 		if [ -z "${next_file}" ] || [ ! -f ${next_file} ]; then
 			next_file=""
 			using_fileindex=false
@@ -375,12 +376,12 @@ get_next_file() {
 		# this will return a filename without the path included
 		echo "Search in directory: '${file_parent}'" >> ./log/next_file
 		if [ ${upload_video_only} != true ]; then 
-			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -v ".h26x" | grep -A1 ${file_name} | grep -v ${file_name})  # filename only
+			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent} | grep -v ".h26x" | sed -n "/${file_name}/{n;p}")  # filename only
 			if [ ! -z "${next_file}" ]; then 
 				next_file="${SD_RECORD_ROOT}/${file_parent}/${next_file}"
 			fi 
 		else
-			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent}/*.mp4 | grep -A1 ${file_name} | grep -v ${file_name}) # full path
+			next_file=$(ls -1 ${SD_RECORD_ROOT}/${file_parent}/*.mp4 | sed -n "/${file_name}/{n;p}") # full path
 		fi
 		
 		# check the newer file from another newer folder
@@ -414,8 +415,10 @@ get_next_file() {
 
 # param: $1=current_folder_name, like 2022Y11M12D15H
 # return: hourly-named folder name, like 2022Y11M12D16H
+# use sed to get because some devices don't support grep -A option
 get_next_folder() {
-	ls -d ${SD_RECORD_ROOT}/202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
+	# ls -d ${SD_RECORD_ROOT}/202* | sed 's/\s+/\n/g' | grep -A1 $1 | grep -v $1
+	ls -d ${SD_RECORD_ROOT}/202* | sed 's/\s+/\n/g' | sed -n "/$1/{n;p}"
 }
 
 # param: $1=sd_video_file_path

@@ -216,7 +216,7 @@ parse_upload_response() {
 	local resp_json=''
 	if [ ${#1} -gt 3 ]; then
 		status_code=${1: -3}
-		resp_json=${1:: -3}
+		resp_json=${1:0:${#1}-3}  # some devices don't support syntax ${1:: -3}
 		if [ ${status_code} -ge 400 ]; then 
 			error_code=$(echo ${resp_json} | jq -r '.error.innererror.code')
 		else 
