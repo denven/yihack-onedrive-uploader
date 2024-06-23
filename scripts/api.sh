@@ -65,12 +65,13 @@ delete_drive_item() {
 }
 
 # param: $1=item_id, $2="details"
+# adjust to order by name since MS has deprecated order by lastModifiedDateTime feature
 get_drive_items() {
 	query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1'" # query item only
 	if [ $# -gt 1 ]; then
-		query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1/children?select=id,name,size&top=2&orderby=lastModifiedDateTime'"	
+		query="curl -s -k -L -X GET '${DRIVE_BASE_URI}/items/$1/children?select=id,name,size&top=2&orderby=name'"	
 		# query=${query}"children?select=id,name,size&top=2&orderby=lastModifiedDateTime'"	
-	fi 
+	fi
 	send_api_request "get_drive_item" $@
 }
 
