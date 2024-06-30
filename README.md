@@ -23,11 +23,13 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 ## Supported camera models
 > Yi cameras hacked with the same file hiearacy or builtin applications are more likely to be supported. Anyway, your own separate tests are necessary before you use it. I've tested on my own camera.
   - [x] model y201c(Yi 1080p Dome BFUS) with firmware 4.6.0.0A_201908271549 and yi-hack-MStar 0.4.7 by [denven](https://github.com/denven)
+  - [x] model y623(Yi 1080p Pro 2K YFUS) with firmware 12.0.51.08_202403081746 and Allwinner v2 firmware: 0.3.2 by @[mrxyzl](https://github.com/mrxyzl)
+
   - [ ] welcome to test it on your camera :smile:
 
 ## How to use the uploader?
 ### Prerequisites
-1. make sure you've hacked your camera, please check [yi-hack-MStar](https://github.com/roleoroleo/yi-hack-MStar)
+1. make sure you've hacked your camera with the matched firmware, please check [yi-hack-MStar](https://github.com/roleoroleo/yi-hack-MStar) or [yi-hack-Allwinner-v2](https://github.com/roleoroleo/yi-hack-Allwinner-v2)
 2. you have an OneDrive account assosiated with your [Microsoft Azure](https://portal.azure.com/) account, you'd better have some knowledge of using the Azure portal.
 
 
