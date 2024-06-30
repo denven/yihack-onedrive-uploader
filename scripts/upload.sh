@@ -324,14 +324,16 @@ parse_file_parent() {
 # return: 07M20S40.mp4 
 parse_file_name() {
 	# e.g: ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
-	echo $1 | grep -oE "[0-9]{2}M[0-9]{2}S[0-9]{2}.*"
+	echo $1 | grep -oE "[a-zA-Z]?[0-9]{2,3}M[0-9]{2}S[0-9]{2}.*"
 }
 
 # param: $1=file_full_path
 # return: 2022Y11M12D15H07M20S40
 parse_file_uniq_name() {
 	# e.g: ${SD_RECORD_ROOT}/2022Y11M12D15H/07M20S40.mp4
-	echo $1 | sed 's/\/tmp\/sd\/record\///' | sed 's/\///' | sed 's/\..*$//'
+	# echo $1 | sed 's/\/tmp\/sd\/record\///' | sed 's/\///' | sed 's/\..*$//'
+	echo $1 | sed -E 's#.*/([0-9]{4}Y[0-9]{2}M[0-9]{2}D[0-9]{2}H)/[a-zA-Z]?[0-9]?([0-9]{2}M[0-9]{2}S[0-9]{2})\..*#\1\2#g'
+
 }
 
 # param: $1=folder_name
