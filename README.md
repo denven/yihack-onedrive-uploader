@@ -1,7 +1,7 @@
 # OneDrive-uploader for Yi IP Cameras
 
 ### To visitors and cloners:
-- Any issue 🐛 is welcome if you find a bug or have a question to ask
+- Any issue is welcome if you find a bug or have a question to ask
 - Test feedback on your camera is invaluable to all users at anytime
 - Please note that OneDrive resumable API for uploading file larger than 4MB is not very reliable for my case, see [issue](https://github.com/denven/yihack-onedrive-uploader/issues/6). However, YMMV.
 - A star 🌟 from you is the best encouragement to me if you think this repository helps you.
@@ -83,11 +83,13 @@ If you have a subscription of Microsoft OneDrive Stroage or Microsoft 365 Develo
 |    client_secret | "" | fill in with your data
 |    tenant_id | "" | for personal account, set it as "consumers"; for tenant account, set a specific tenant id
 |    scope | https://graph.microsoft.com/.default | not required
-|    video_root_folder | yihack_videos |  name string without white spaces
+|    video_root_folder | yihack_videos |  name string without white spaces, just **let this program to create it for you** on your OneDrive
 |    upload_video_only | true | not required; set it false will upload *.jpg files in the record folders
 |    convert_utc_path_name | false | not required; set it to true if you don't like the uploaded folders are in UTC time (for firmware v0.4.9 and later)
-|    auto_clean_threshold | 100 |  value in range [50, 100) will enable this feature
+|    auto_clean_threshold | 100 |  disabled by default; setting a value in range [50, 100) will enable this feature
 |    enable_idle_transfer | false |  setting to true has chances of files upload delayed
+|    video_root_folder_id | "" |  auto-filled value when your root upload folder is created by this program, DO NOT fill it manually if you dont know your root upload folder id.
+
 
 3. upload code and dependent files to your camera sd card via `ssh` with `root` account or a FTP tool, the target path: `/tmp/sd/yi-hack`:
    - create an empty directory named `onedrive` in path `/tmp/sd/yi-hack`
@@ -108,6 +110,9 @@ cd /tmp/sd/yi-hack/onedrive/
 ![Successful configuration](./screenshots/successful_configuration.png)
 - Check your uploaded folder structure, you will find folders are organized by months and dates, which are more convenient to find and view.
 ![Successful configuration](./screenshots/organize_uploaded_folders.png)
+- Check auto-clean logs (the earliest folder-hourly video folder will be deleted first when your storage usage exceeded the specified threshhold ratio).
+![image](https://github.com/user-attachments/assets/329adca6-2fa3-4b6f-92ce-c22949a3fad5)
+
 
 6. optional: reboot your camera
 ```bash
